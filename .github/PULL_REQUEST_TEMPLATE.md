@@ -23,7 +23,7 @@
 
 ## Deployment
 <Please indicate if any of the following are true>
-<includes migrations>
+<Includes migrations>
 <Includes seeds> 
 <Requires downtime>
 <Downtime is required if a service is going offline for large migrations or if dependencies in 2 repos needs to be launched at the same time.>
