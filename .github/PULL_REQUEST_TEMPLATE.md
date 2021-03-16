@@ -31,3 +31,7 @@
 <Requires downtime>
 <Downtime is required if a service is going offline for large migrations or if dependencies in 2 repos needs to be launched at the same time.>
 <Use this section to list any scripts that need to run upon deployment.>
+
+<IMPORTANT>
+<Remember to update the release candidate pr>
+<IMPORTANT>
