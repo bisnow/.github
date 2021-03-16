@@ -4,6 +4,9 @@
 ## Related PRs
 <Links to PRs related to this updated and or links to required packages and versions.>
 
+## Release PR
+<Link to the Github release PR.>
+
 ## Description
 <What was changed.>
 
