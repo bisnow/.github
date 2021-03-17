@@ -1,5 +1,5 @@
 ## Related PRs
-<Links to external PRs required for release. These are copied from the PRs in the release.>
+<Links to PRs in other repos required for release. These are copied from the PRs in the release.>
 
 ## Release Notes
 <Copy from the release notes section of each PR.>
