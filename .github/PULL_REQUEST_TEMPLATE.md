@@ -4,8 +4,8 @@
 ## Related PRs
 <Links to PRs related to this updated and or links to required packages and versions.>
 
-## Release PR
-<Link to the Github release PR.>
+## Release Notes
+<Release notes are for non-technical people. You can find release notes in the Jira ticket. Please add your name to the end of the release notes in parentheses.>
 
 ## Description
 <What was changed.>
@@ -31,7 +31,3 @@
 <Requires downtime>
 <Downtime is required if a service is going offline for large migrations or if dependencies in 2 repos needs to be launched at the same time.>
 <Use this section to list any scripts that need to run upon deployment.>
-
-<IMPORTANT>
-<Remember to update the release candidate pr>
-<IMPORTANT>
