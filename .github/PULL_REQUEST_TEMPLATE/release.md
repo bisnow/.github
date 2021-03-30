@@ -3,6 +3,9 @@
 
 ## Release Notes
 <Copy from the release notes section of each PR.>
+  
+## Dependencies
+<Links to PRs or repositories required to be released before this release.>
 
 ## Deployment
 <Please indicate if any of the following are true. This data should be populated from a PR. Do not uncheck anything that is checked.>  
