@@ -25,6 +25,9 @@
 ## QA
 <Items to add to Ghost Inspector or specific items to test manually with instructions on how to test.>
 
+## Dependencies
+<Links to PRs required to go into production before this PR.>
+
 ## Deployment
 <Please indicate if any of the following are true>
 <Includes migrations>
