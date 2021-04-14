@@ -13,4 +13,4 @@
 <Includes seeds>  
 <Requires downtime>  
 <Downtime is required if a service is going offline for large migrations or if dependencies in 2 repos needs to be launched at the same time.>  
-<Copy any scripts required to run after releaseing a PR.>
+<Copy any scripts required to run after releasing a PR.>
