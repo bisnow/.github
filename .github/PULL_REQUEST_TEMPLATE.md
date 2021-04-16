@@ -10,9 +10,6 @@
 ## Description
 <What was changed.>
 
-## Reviewers
-<Mentions of the person or team to review.>
-
 ## Testing
 <Instructions for reviewers to verify your update works. This should contain details for the reviewer to use your new feature. It should not contain information about unit tests.>
 <Please include>
