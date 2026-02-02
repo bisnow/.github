@@ -29,7 +29,9 @@ jobs:
           tools: composer
 
       - name: Install dependencies
-        run: composer install --prefer-dist --no-progress
+        run: |
+          composer config github-oauth.github.com ${{ secrets.PAT }}
+          composer install --no-scripts --no-progress
 
       - name: Run Laravel Rector
         run: composer rector
