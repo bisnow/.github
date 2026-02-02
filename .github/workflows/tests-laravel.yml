@@ -17,21 +17,11 @@ on:
         required: false
         type: string
         default: '["ubuntu-24.04"]'
-      laravel:
-        description: 'JSON array of Laravel versions for the matrix'
-        required: false
-        type: string
-        default: '["12.*"]'
       dependency_version:
         description: 'JSON array of dependency-version values for the matrix'
         required: false
         type: string
         default: '["prefer-stable"]'
-      node_version:
-        description: 'Node.js version to use when NPM is enabled'
-        required: false
-        type: string
-        default: '22'
       enable_npm:
         description: 'Enable NPM install/build steps'
         required: false
@@ -65,14 +55,15 @@ jobs:
       matrix:
         php: ${{ fromJson(inputs.php) }}
         operating-system: ${{ fromJson(inputs.os) }}
-        laravel: ${{ fromJson(inputs.laravel) }}
         dependency-version: ${{ fromJson(inputs.dependency_version) }}
 
-    name: P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.dependency-version }}
+    name: P${{ matrix.php }} - ${{ matrix.dependency-version }}
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref }}
 
       - name: Start MySQL and Redis
         run: |
@@ -105,7 +96,7 @@ jobs:
         if: ${{ inputs.enable_npm }}
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ inputs.node_version }}
+          node-version-file: .nvmrc
 
       - name: Wait for MySQL to be healthy
         run: |

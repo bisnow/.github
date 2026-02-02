@@ -3,10 +3,16 @@ on:
   push:
     branches-ignore:
       - main
-  workflow_call: {}
+  workflow_call:
+    inputs:
+      php:
+        description: 'PHP version'
+        required: false
+        type: string
+        default: '8.4'
 
 jobs:
-  php-cs-fixer:
+  pint:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -16,19 +22,33 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
 
-      - name: Run PHP CS Fixer
-        uses: docker://oskarstark/php-cs-fixer-ga
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
         with:
-          path: .php-cs-fixer.cache
-          key: ${{ runner.temp }}-${{ github.repository }}-phpcsfixer-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.temp }}-${{ github.repository }}-phpcsfixer-
-          args: --config=.php-cs-fixer.dist.php --allow-risky=yes
+          php-version: ${{ inputs.php || '8.4' }}
+          tools: composer
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress
+
+      - name: Run Laravel Rector
+        run: composer rector
+
+      - name: Commit changes
+        id: auto_commit_rector_action
+        uses: stefanzweifel/git-auto-commit-action@v6
+        with:
+          commit_message: "[skip actions] Apply rector fixes"
+          commit_user_name: GitHub Action
+          commit_user_email: actions@github.com
+
+      - name: Run Laravel Pint
+        run: composer cs-fix
 
       - name: Commit changes
         id: auto_commit_action
         uses: stefanzweifel/git-auto-commit-action@v6
         with:
-          commit_message: (ignore) Apply style fixes
+          commit_message: "[skip actions] Apply style fixes"
           commit_user_name: GitHub Action
           commit_user_email: actions@github.com
