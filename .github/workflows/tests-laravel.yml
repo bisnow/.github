@@ -1,0 +1,186 @@
+name: Tests
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: read
+
+on:
+  workflow_run:
+    workflows: ["Code Styling"]
+    types:
+      - completed
+  workflow_call:
+    inputs:
+      php:
+        description: 'JSON array of PHP versions for the matrix'
+        required: false
+        type: string
+        default: '["8.4"]'
+      os:
+        description: 'JSON array of operating systems for the matrix'
+        required: false
+        type: string
+        default: '["ubuntu-24.04"]'
+      laravel:
+        description: 'JSON array of Laravel versions for the matrix'
+        required: false
+        type: string
+        default: '["12.*"]'
+      dependency_version:
+        description: 'JSON array of dependency-version values for the matrix'
+        required: false
+        type: string
+        default: '["prefer-stable"]'
+      node_version:
+        description: 'Node.js version to use when NPM is enabled'
+        required: false
+        type: string
+        default: '22'
+      enable_npm:
+        description: 'Enable NPM install/build steps'
+        required: false
+        type: boolean
+        default: false
+      db_username:
+        description: 'Database username for tests'
+        required: false
+        type: string
+        default: 'root'
+      db_password:
+        description: 'Database password for tests'
+        required: false
+        type: string
+        default: 'root'
+
+env:
+  DB_USERNAME: ${{ github.event_name == 'workflow_call' && inputs.db_username || 'root' }}
+  DB_PASSWORD: ${{ github.event_name == 'workflow_call' && inputs.db_password || 'root' }}
+  DB_HOST: 127.0.0.1
+  NEXUS_DNS_VALIDATE: false
+  REDIS_SCHEME: tcp
+
+jobs:
+  PHPUnit:
+    if: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch != 'main') || github.event_name == 'workflow_call' }}
+    runs-on: ${{ matrix.operating-system }}
+
+    strategy:
+      fail-fast: true
+      max-parallel: 6
+      matrix:
+        php: ${{ fromJson(inputs.php) }}
+        operating-system: ${{ fromJson(inputs.os) }}
+        laravel: ${{ fromJson(inputs.laravel) }}
+        dependency-version: ${{ fromJson(inputs.dependency_version) }}
+
+    name: P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.dependency-version }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
+      - name: Start MySQL and Redis
+        run: |
+          # Start MySQL in the background
+          docker run -d \
+            --name mysql-test \
+            -e MYSQL_ROOT_PASSWORD=${{ env.DB_PASSWORD }} \
+            -p 3306:3306 \
+            --health-cmd="mysqladmin ping --silent" \
+            --health-interval=10s \
+            --health-timeout=5s \
+            --health-retries=3 \
+            mysql:8.0.32
+
+          # Start Redis in parallel
+          docker run -d \
+            --name redis-test \
+            -p 6379:6379 \
+            redis:alpine
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, dom, fileinfo, mysql
+          coverage: pcov
+          tools: composer
+
+      - name: Setup Node
+        if: ${{ inputs.enable_npm }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+
+      - name: Wait for MySQL to be healthy
+        run: |
+          echo "Waiting for MySQL to be healthy..."
+          timeout 60 sh -c 'until docker inspect --format="{{.State.Health.Status}}" mysql-test | grep -q healthy; do sleep 2; done'
+
+      - name: Create Databases
+        run: |
+          mysql --host=127.0.0.1 --user=${{ env.DB_USERNAME }} --password=${{ env.DB_PASSWORD }} <<CREATE_DB
+          CREATE DATABASE reveal CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+          CREATE_DB
+
+      - name: Get composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache/files
+          key: ${{ runner.os }}-php${{ matrix.php }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php${{ matrix.php }}-composer-
+            ${{ runner.os }}-composer-
+          enableCrossOsArchive: true
+
+      - name: Install dependencies
+        run: |
+          composer config github-oauth.github.com ${{ secrets.PAT }}
+          composer install --no-progress --optimize-autoloader
+
+      - name: Cache NPM dependencies
+        if: ${{ inputs.enable_npm }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node${{ inputs.node_version }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node${{ inputs.node_version }}-
+            ${{ runner.os }}-node-
+
+      - name: Install NPM dependencies and build
+        if: ${{ inputs.enable_npm }}
+        run: npm ci --prefer-offline --no-audit && npm run build
+
+      - name: Cache Larastan result cache
+        uses: actions/cache@v4
+        with:
+          path: .phpstan.cache
+          key: "phpstan-result-cache-${{ github.repository }}-${{ runner.os }}-php${{ matrix.php }}-${{ hashFiles('composer.lock') }}-${{ hashFiles('phpstan.neon.dist') }}-${{ hashFiles('app/**/*.php') }}"
+          restore-keys: |
+            phpstan-result-cache-${{ github.repository }}-${{ runner.os }}-php${{ matrix.php }}-${{ hashFiles('composer.lock') }}-
+            phpstan-result-cache-${{ github.repository }}-${{ runner.os }}-php${{ matrix.php }}-
+            phpstan-result-cache-${{ github.repository }}-${{ runner.os }}-
+
+      - name: Prepare the application
+        run: |
+          php -r "file_exists('.env') || copy('.env.example', '.env');"
+          php artisan key:generate
+
+      - name: Execute static analysis
+        run: composer phpstan
+
+      - name: Execute tests
+        env:
+          APP_URL: http://localhost
+        run: composer test
+
+      - name: Stop services
+        if: always()
+        run: |
+          docker stop mysql-test redis-test || true
+          docker rm mysql-test redis-test || true
