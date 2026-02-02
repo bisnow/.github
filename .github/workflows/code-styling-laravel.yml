@@ -10,6 +10,9 @@ on:
         required: false
         type: string
         default: '8.4'
+    secrets:
+      COMPOSER_OAUTH_GITHUB_ACTIONS:
+        required: true
 
 jobs:
   pint:

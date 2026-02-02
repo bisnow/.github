@@ -37,6 +37,9 @@ on:
         required: false
         type: string
         default: 'root'
+    secrets:
+      COMPOSER_OAUTH_GITHUB_ACTIONS:
+        required: true
 
 env:
   DB_USERNAME: ${{ inputs.db_username }}
