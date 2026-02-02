@@ -125,7 +125,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          composer config github-oauth.github.com ${{ secrets.PAT }}
+          composer config github-oauth.github.com ${{ secrets.COMPOSER_OAUTH_GITHUB_ACTIONS }}
           composer install --no-progress --optimize-autoloader
 
       - name: Cache NPM dependencies
