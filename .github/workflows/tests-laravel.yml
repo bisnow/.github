@@ -5,10 +5,6 @@ permissions:
   pull-requests: read
 
 on:
-  workflow_run:
-    workflows: ["Code Styling"]
-    types:
-      - completed
   workflow_call:
     inputs:
       php:
@@ -53,15 +49,14 @@ on:
         default: 'root'
 
 env:
-  DB_USERNAME: ${{ github.event_name == 'workflow_call' && inputs.db_username || 'root' }}
-  DB_PASSWORD: ${{ github.event_name == 'workflow_call' && inputs.db_password || 'root' }}
+  DB_USERNAME: ${{ inputs.db_username }}
+  DB_PASSWORD: ${{ inputs.db_password }}
   DB_HOST: 127.0.0.1
   NEXUS_DNS_VALIDATE: false
   REDIS_SCHEME: tcp
 
 jobs:
   PHPUnit:
-    if: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch != 'main') || github.event_name == 'workflow_call' }}
     runs-on: ${{ matrix.operating-system }}
 
     strategy:
