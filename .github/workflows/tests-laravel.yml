@@ -36,12 +36,22 @@ on:
         description: 'Database password for tests'
         required: false
         type: string
-        default: ''
-      db_names:
-        description: 'JSON array of database names to create'
+        default: 'root'
+      db_name:
+        description: 'Primary database name (sets DB_DATABASE)'
         required: false
         type: string
-        default: '["test"]'
+        default: 'laravel'
+      db_names:
+        description: 'JSON array of additional database names to create'
+        required: false
+        type: string
+        default: '[]'
+      mysql_version:
+        description: 'MySQL Docker image version'
+        required: false
+        type: string
+        default: '8.0.32'
     secrets:
       COMPOSER_OAUTH_GITHUB_ACTIONS:
         required: true
@@ -51,11 +61,25 @@ on:
         required: false
 
 env:
-  DB_USERNAME: ${{ inputs.db_username }}
-  DB_PASSWORD: ${{ inputs.db_password }}
+  # Docker container names
+  MYSQL_CONTAINER: mysql-test
+  REDIS_CONTAINER: redis-test
+
+  # Database configuration
+  DB_DATABASE: ${{ inputs.db_name }}
   DB_HOST: 127.0.0.1
-  NEXUS_DNS_VALIDATE: false
+  DB_PASSWORD: ${{ inputs.db_password }}
+  DB_PORT: 3306
+  DB_USERNAME: ${{ inputs.db_username }}
+
+  # Redis configuration
+  REDIS_HOST: 127.0.0.1
+  REDIS_PORT: 6379
   REDIS_SCHEME: tcp
+
+  # App-specific
+  APP_URL: http://localhost
+  NEXUS_DNS_VALIDATE: false
 
 jobs:
   PHPUnit:
@@ -80,19 +104,19 @@ jobs:
         run: |
           # Start MySQL in the background
           docker run -d \
-            --name mysql-test \
-            -e MYSQL_ROOT_PASSWORD=${{ env.DB_PASSWORD }} \
-            -p 3306:3306 \
+            --name ${MYSQL_CONTAINER} \
+            -e MYSQL_ROOT_PASSWORD=${DB_PASSWORD} \
+            -p ${DB_PORT}:3306 \
             --health-cmd="mysqladmin ping --silent" \
             --health-interval=10s \
             --health-timeout=5s \
             --health-retries=3 \
-            mysql:8.0.32
+            mysql:${{ inputs.mysql_version }}
 
           # Start Redis in parallel
           docker run -d \
-            --name redis-test \
-            -p 6379:6379 \
+            --name ${REDIS_CONTAINER} \
+            -p ${REDIS_PORT}:6379 \
             redis:alpine
 
       - name: Setup PHP
@@ -112,16 +136,42 @@ jobs:
       - name: Wait for MySQL to be healthy
         run: |
           echo "Waiting for MySQL to be healthy..."
-          timeout 60 sh -c 'until docker inspect --format="{{.State.Health.Status}}" mysql-test | grep -q healthy; do sleep 2; done'
+          timeout 60 sh -c 'until docker inspect --format="{{.State.Health.Status}}" ${MYSQL_CONTAINER} | grep -q healthy; do sleep 2; done'
 
       - name: Create Databases
         run: |
-          DB_NAMES='${{ inputs.db_names }}'
-          echo "$DB_NAMES" | jq -r '.[]' | while read -r db_name; do
-            echo "Creating database: $db_name"
-            mysql --host=127.0.0.1 --user=${{ env.DB_USERNAME }} ${{ env.DB_PASSWORD != '' && format('--password={0}', env.DB_PASSWORD) || '' }} <<CREATE_DB
-          CREATE DATABASE IF NOT EXISTS \`${db_name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-          CREATE_DB
+          # Create primary database
+          echo "Creating primary database: ${DB_DATABASE}"
+          mysql --host=${DB_HOST} --user=${DB_USERNAME} --password=${DB_PASSWORD} \
+            -e "CREATE DATABASE IF NOT EXISTS \`${DB_DATABASE}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+          # Create additional databases
+          for db_name in $(echo '${{ inputs.db_names }}' | jq -r '.[]'); do
+            echo "Creating additional database: $db_name"
+            mysql --host=${DB_HOST} --user=${DB_USERNAME} --password=${DB_PASSWORD} \
+              -e "CREATE DATABASE IF NOT EXISTS \`$db_name\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+          done
+
+      - name: Import Database Schemas
+        run: |
+          # Check for primary database schema (named after connection)
+          for schema_file in "database/schema/mysql.sql" "database/schema/mysql-schema.sql"; do
+            if [ -f "$schema_file" ]; then
+              echo "Importing schema: $schema_file"
+              mysql --host=${DB_HOST} --user=${DB_USERNAME} --password=${DB_PASSWORD} "${DB_DATABASE}" < "$schema_file"
+              break
+            fi
+          done
+
+          # Check additional databases for schema files
+          for db_name in $(echo '${{ inputs.db_names }}' | jq -r '.[]'); do
+            for schema_file in "database/schema/${db_name}.sql" "database/schema/${db_name}-schema.sql"; do
+              if [ -f "$schema_file" ]; then
+                echo "Importing schema: $schema_file"
+                mysql --host=${DB_HOST} --user=${DB_USERNAME} --password=${DB_PASSWORD} "$db_name" < "$schema_file"
+                break
+              fi
+            done
           done
 
       - name: Get composer cache directory
@@ -172,19 +222,21 @@ jobs:
 
       - name: Prepare the application
         run: |
-          php -r "file_exists('.env') || copy('.env.example', '.env');"
+          if [ -f .env.ci.example ]; then
+            cp .env.ci.example .env
+          elif [ -f .env.example ]; then
+            cp .env.example .env
+          fi
           php artisan key:generate
 
       - name: Execute static analysis
         run: composer phpstan
 
       - name: Execute tests
-        env:
-          APP_URL: http://localhost
         run: composer test
 
       - name: Stop services
         if: always()
         run: |
-          docker stop mysql-test redis-test || true
-          docker rm mysql-test redis-test || true
+          docker stop ${MYSQL_CONTAINER} ${REDIS_CONTAINER} || true
+          docker rm ${MYSQL_CONTAINER} ${REDIS_CONTAINER} || true
