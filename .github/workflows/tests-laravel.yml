@@ -189,7 +189,11 @@ jobs:
 
       - name: Prepare the application
         run: |
-          php -r "file_exists('.env') || copy('.env.example', '.env');"
+          if [ -f .env.ci.example ]; then
+            cp .env.ci.example .env
+          elif [ -f .env.example ]; then
+            cp .env.example .env
+          fi
           php artisan key:generate
 
       - name: Execute static analysis
