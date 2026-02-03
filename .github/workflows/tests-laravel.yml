@@ -37,11 +37,16 @@ on:
         required: false
         type: string
         default: 'root'
-      db_names:
-        description: 'JSON array of database names to create'
+      db_name:
+        description: 'Primary database name (sets DB_DATABASE)'
         required: false
         type: string
-        default: '["test"]'
+        default: 'laravel'
+      db_names:
+        description: 'JSON array of additional database names to create'
+        required: false
+        type: string
+        default: '[]'
       mysql_version:
         description: 'MySQL Docker image version'
         required: false
@@ -61,6 +66,7 @@ env:
   REDIS_CONTAINER: redis-test
 
   # Database configuration
+  DB_DATABASE: ${{ inputs.db_name }}
   DB_HOST: 127.0.0.1
   DB_PASSWORD: ${{ inputs.db_password }}
   DB_PORT: 3306
@@ -134,12 +140,39 @@ jobs:
 
       - name: Create Databases
         run: |
+          # Create primary database
+          echo "Creating primary database: ${DB_DATABASE}"
+          mysql --host=${DB_HOST} --user=${DB_USERNAME} --password=${DB_PASSWORD} \
+            -e "CREATE DATABASE IF NOT EXISTS \`${DB_DATABASE}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+          # Create additional databases
           for db_name in $(echo '${{ inputs.db_names }}' | jq -r '.[]'); do
-            echo "Creating database: $db_name"
+            echo "Creating additional database: $db_name"
             mysql --host=${DB_HOST} --user=${DB_USERNAME} --password=${DB_PASSWORD} \
               -e "CREATE DATABASE IF NOT EXISTS \`$db_name\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
           done
-          echo "DB_DATABASE=$(echo '${{ inputs.db_names }}' | jq -r '.[0]')" >> $GITHUB_ENV
+
+      - name: Import Database Schemas
+        run: |
+          # Check for primary database schema (named after connection)
+          for schema_file in "database/schema/mysql.sql" "database/schema/mysql-schema.sql"; do
+            if [ -f "$schema_file" ]; then
+              echo "Importing schema: $schema_file"
+              mysql --host=${DB_HOST} --user=${DB_USERNAME} --password=${DB_PASSWORD} "${DB_DATABASE}" < "$schema_file"
+              break
+            fi
+          done
+
+          # Check additional databases for schema files
+          for db_name in $(echo '${{ inputs.db_names }}' | jq -r '.[]'); do
+            for schema_file in "database/schema/${db_name}.sql" "database/schema/${db_name}-schema.sql"; do
+              if [ -f "$schema_file" ]; then
+                echo "Importing schema: $schema_file"
+                mysql --host=${DB_HOST} --user=${DB_USERNAME} --password=${DB_PASSWORD} "$db_name" < "$schema_file"
+                break
+              fi
+            done
+          done
 
       - name: Get composer cache directory
         id: composer-cache
