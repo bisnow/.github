@@ -1,8 +1,5 @@
 name: Code Styling
 on:
-  push:
-    branches-ignore:
-      - main
   workflow_call:
     inputs:
       php:
