@@ -36,7 +36,12 @@ on:
         description: 'Database password for tests'
         required: false
         type: string
-        default: 'root'
+        default: ''
+      db_names:
+        description: 'JSON array of database names to create'
+        required: false
+        type: string
+        default: '["test"]'
     secrets:
       COMPOSER_OAUTH_GITHUB_ACTIONS:
         required: true
@@ -54,6 +59,7 @@ env:
 
 jobs:
   PHPUnit:
+    name: PHPUnit & PHPStan
     runs-on: ${{ matrix.operating-system }}
 
     strategy:
@@ -63,8 +69,6 @@ jobs:
         php: ${{ fromJson(inputs.php) }}
         operating-system: ${{ fromJson(inputs.os) }}
         dependency-version: ${{ fromJson(inputs.dependency_version) }}
-
-    name: P${{ matrix.php }} - ${{ matrix.dependency-version }}
 
     steps:
       - name: Checkout Code
@@ -112,9 +116,13 @@ jobs:
 
       - name: Create Databases
         run: |
-          mysql --host=127.0.0.1 --user=${{ env.DB_USERNAME }} --password=${{ env.DB_PASSWORD }} <<CREATE_DB
-          CREATE DATABASE reveal CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+          DB_NAMES='${{ inputs.db_names }}'
+          echo "$DB_NAMES" | jq -r '.[]' | while read -r db_name; do
+            echo "Creating database: $db_name"
+            mysql --host=127.0.0.1 --user=${{ env.DB_USERNAME }} ${{ env.DB_PASSWORD != '' && format('--password={0}', env.DB_PASSWORD) || '' }} <<CREATE_DB
+          CREATE DATABASE IF NOT EXISTS \`${db_name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
           CREATE_DB
+          done
 
       - name: Get composer cache directory
         id: composer-cache
