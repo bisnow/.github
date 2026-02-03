@@ -13,6 +13,10 @@ on:
     secrets:
       COMPOSER_OAUTH_GITHUB_ACTIONS:
         required: true
+      FLUX_USERNAME:
+        required: false
+      FLUX_PASSWORD:
+        required: false
 
 jobs:
   pint:
@@ -34,6 +38,9 @@ jobs:
       - name: Install dependencies
         run: |
           composer config github-oauth.github.com ${{ secrets.COMPOSER_OAUTH_GITHUB_ACTIONS }}
+          if [ -n "${{ secrets.FLUX_USERNAME }}" ]; then
+            composer config http-basic.composer.fluxui.dev "${{ secrets.FLUX_USERNAME }}" "${{ secrets.FLUX_PASSWORD }}"
+          fi
           composer install --no-scripts --no-progress
 
       - name: Run Laravel Rector
