@@ -20,6 +20,7 @@ on:
 
 jobs:
   pint:
+    name: Pint & Rector
     runs-on: ubuntu-latest
     permissions:
       contents: write
