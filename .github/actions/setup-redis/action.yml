@@ -1,0 +1,31 @@
+name: Set up Redis
+description: Start Redis container
+
+inputs:
+  image:
+    description: Docker image
+    required: false
+    default: 'valkey/valkey'
+  version:
+    description: Docker image version
+    required: false
+    default: 'alpine'
+  container-name:
+    description: Container name
+    required: false
+    default: 'redis-test'
+  port:
+    description: Port
+    required: false
+    default: '6379'
+
+runs:
+  using: composite
+  steps:
+    - name: Start container
+      shell: bash
+      run: |
+        docker run -d \
+          --name ${{ inputs.container-name }} \
+          -p ${{ inputs.port }}:6379 \
+          ${{ inputs.image }}:${{ inputs.version }}

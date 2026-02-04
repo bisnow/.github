@@ -1,0 +1,96 @@
+name: Set up MySQL
+description: Start MySQL container, create databases, and import schemas
+
+inputs:
+  mysql-version:
+    description: MySQL Docker image version
+    required: false
+    default: '8.0.32'
+  container-name:
+    description: Container name
+    required: false
+    default: 'mysql-test'
+  db-host:
+    description: Database host
+    required: false
+    default: '127.0.0.1'
+  db-port:
+    description: Database port
+    required: false
+    default: '3306'
+  db-username:
+    description: Database username
+    required: false
+    default: 'root'
+  db-password:
+    description: Database password
+    required: false
+    default: 'root'
+  db-name:
+    description: Primary database name
+    required: false
+    default: 'laravel'
+  db-names:
+    description: JSON array of additional database names
+    required: false
+    default: '[]'
+
+runs:
+  using: composite
+  steps:
+    - name: Start container
+      shell: bash
+      run: |
+        docker run -d \
+          --name ${{ inputs.container-name }} \
+          -e MYSQL_ROOT_PASSWORD=${{ inputs.db-password }} \
+          -p ${{ inputs.db-port }}:3306 \
+          --health-cmd="mysqladmin ping --silent" \
+          --health-interval=10s \
+          --health-timeout=5s \
+          --health-retries=3 \
+          mysql:${{ inputs.mysql-version }}
+
+    - name: Wait for healthy status
+      shell: bash
+      run: |
+        echo "Waiting for MySQL to be healthy..."
+        timeout 60 sh -c 'until docker inspect --format="{{.State.Health.Status}}" ${{ inputs.container-name }} | grep -q healthy; do sleep 2; done'
+
+    - name: Create databases
+      shell: bash
+      run: |
+        # Create primary database
+        echo "Creating primary database: ${{ inputs.db-name }}"
+        mysql --host=${{ inputs.db-host }} --user=${{ inputs.db-username }} --password=${{ inputs.db-password }} \
+          -e "CREATE DATABASE IF NOT EXISTS \`${{ inputs.db-name }}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+        # Create additional databases
+        for db_name in $(echo '${{ inputs.db-names }}' | jq -r '.[]'); do
+          echo "Creating additional database: $db_name"
+          mysql --host=${{ inputs.db-host }} --user=${{ inputs.db-username }} --password=${{ inputs.db-password }} \
+            -e "CREATE DATABASE IF NOT EXISTS \`$db_name\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+        done
+
+    - name: Import schemas
+      shell: bash
+      run: |
+        # Check for primary database schema (named after connection)
+        for schema_file in "database/schema/mysql.sql" "database/schema/mysql-schema.sql"; do
+          if [ -f "$schema_file" ]; then
+            echo "Importing schema: $schema_file"
+            mysql --host=${{ inputs.db-host }} --user=${{ inputs.db-username }} --password=${{ inputs.db-password }} "${{ inputs.db-name }}" < "$schema_file"
+            break
+          fi
+        done
+
+        # Check additional databases for schema files
+        for db_name in $(echo '${{ inputs.db-names }}' | jq -r '.[]'); do
+          for schema_file in "database/schema/${db_name}.sql" "database/schema/${db_name}-schema.sql"; do
+            if [ -f "$schema_file" ]; then
+              echo "Importing schema: $schema_file"
+              mysql --host=${{ inputs.db-host }} --user=${{ inputs.db-username }} --password=${{ inputs.db-password }} "$db_name" < "$schema_file"
+              break
+            fi
+          done
+        done

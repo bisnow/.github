@@ -1,0 +1,59 @@
+name: Set up PHP and Composer
+description: Set up PHP, configure Composer authentication, cache dependencies, and install
+
+inputs:
+  php-version:
+    description: PHP version
+    required: true
+  extensions:
+    description: PHP extensions to install
+    required: false
+    default: 'mbstring, dom, fileinfo, mysql'
+  coverage:
+    description: Coverage driver
+    required: false
+    default: 'pcov'
+  composer-oauth-token:
+    description: GitHub OAuth token for Composer
+    required: true
+  flux-username:
+    description: Flux Pro username
+    required: false
+  flux-password:
+    description: Flux Pro password
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Set up PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ inputs.php-version }}
+        extensions: ${{ inputs.extensions }}
+        coverage: ${{ inputs.coverage }}
+        tools: composer
+
+    - name: Get Composer cache directory
+      id: composer-cache
+      shell: bash
+      run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+    - name: Cache dependencies
+      uses: actions/cache@v5
+      with:
+        path: ~/.composer/cache/files
+        key: ${{ runner.os }}-php${{ inputs.php-version }}-composer-${{ hashFiles('**/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-php${{ inputs.php-version }}-composer-
+          ${{ runner.os }}-composer-
+        enableCrossOsArchive: true
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        composer config -g github-oauth.github.com ${{ inputs.composer-oauth-token }}
+        if [ -n "${{ inputs.flux-username }}" ]; then
+          composer config http-basic.composer.fluxui.dev "${{ inputs.flux-username }}" "${{ inputs.flux-password }}"
+        fi
+        composer install --no-progress --optimize-autoloader

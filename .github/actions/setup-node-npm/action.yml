@@ -1,0 +1,37 @@
+name: Set up Node and npm
+description: Set up Node.js, cache dependencies, install, and build
+
+inputs:
+  node-version-file:
+    description: Path to node version file
+    required: false
+    default: '.nvmrc'
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node
+      uses: actions/setup-node@v6
+      with:
+        node-version-file: ${{ inputs.node-version-file }}
+
+    - name: Cache dependencies
+      uses: actions/cache@v5
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json', 'package.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        if [ -f package-lock.json ]; then
+          npm ci --prefer-offline --no-audit
+        else
+          npm install --no-audit
+        fi
+
+    - name: Build
+      shell: bash
+      run: npm run build

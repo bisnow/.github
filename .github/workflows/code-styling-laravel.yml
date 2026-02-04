@@ -22,12 +22,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
+      - name: Check out code
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.head_ref }}
 
-      - name: Setup PHP
+      - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ inputs.php || '8.4' }}
@@ -46,7 +46,7 @@ jobs:
 
       - name: Commit changes
         id: auto_commit_rector_action
-        uses: stefanzweifel/git-auto-commit-action@v6
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "[skip actions] Apply rector fixes"
           commit_user_name: GitHub Action
@@ -57,7 +57,7 @@ jobs:
 
       - name: Commit changes
         id: auto_commit_action
-        uses: stefanzweifel/git-auto-commit-action@v6
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "[skip actions] Apply style fixes"
           commit_user_name: GitHub Action
