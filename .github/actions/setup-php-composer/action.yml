@@ -56,4 +56,4 @@ runs:
         if [ -n "${{ inputs.flux-username }}" ]; then
           composer config http-basic.composer.fluxui.dev "${{ inputs.flux-username }}" "${{ inputs.flux-password }}"
         fi
-        composer install --no-progress --optimize-autoloader
+        composer install --no-progress --prefer-dist --optimize-autoloader
