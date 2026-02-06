@@ -214,7 +214,7 @@ jobs:
 
       # Start all services (without waiting)
       - name: Start MySQL
-        uses: bisnow/.github/.github/actions/setup-mysql@chore/refactor-actions
+        uses: bisnow/.github/.github/actions/setup-mysql@v2
         with:
           wait: false
           use-docker: ${{ inputs.mysql_use_docker }}
@@ -230,7 +230,7 @@ jobs:
 
       - name: Start OpenSearch
         if: ${{ inputs.enable_opensearch }}
-        uses: bisnow/.github/.github/actions/setup-opensearch@chore/refactor-actions
+        uses: bisnow/.github/.github/actions/setup-opensearch@v2
         with:
           wait: false
           version: ${{ inputs.opensearch_version }}
@@ -239,7 +239,7 @@ jobs:
 
       - name: Start PostgreSQL
         if: ${{ inputs.enable_pgsql }}
-        uses: bisnow/.github/.github/actions/setup-pgsql@chore/refactor-actions
+        uses: bisnow/.github/.github/actions/setup-pgsql@v2
         with:
           wait: false
           use-docker: ${{ inputs.pgsql_use_docker }}
@@ -253,7 +253,7 @@ jobs:
           db-names: ${{ inputs.pgsql_db_names }}
 
       - name: Start Redis
-        uses: bisnow/.github/.github/actions/setup-redis@chore/refactor-actions
+        uses: bisnow/.github/.github/actions/setup-redis@v2
         with:
           wait: false
           image: ${{ inputs.redis_image }}
@@ -263,7 +263,7 @@ jobs:
 
       # Install language tools (while services initialize in background)
       - name: Set up PHP and Composer
-        uses: bisnow/.github/.github/actions/setup-php-composer@chore/refactor-actions
+        uses: bisnow/.github/.github/actions/setup-php-composer@v2
         with:
           php-version: ${{ matrix.php }}
           extensions: ${{ inputs.php_extensions }}
@@ -274,14 +274,14 @@ jobs:
 
       - name: Set up Node and npm
         if: ${{ inputs.enable_npm }}
-        uses: bisnow/.github/.github/actions/setup-node-npm@chore/refactor-actions
+        uses: bisnow/.github/.github/actions/setup-node-npm@v2
         with:
           build-script: ${{ inputs.node_build_script }}
           node-version-file: ${{ inputs.node_version_file }}
 
       # Wait for services, create databases, and import schemas
       - name: Set up MySQL
-        uses: bisnow/.github/.github/actions/setup-mysql@chore/refactor-actions
+        uses: bisnow/.github/.github/actions/setup-mysql@v2
         with:
           use-docker: ${{ inputs.mysql_use_docker }}
           container-name: ${{ env.MYSQL_CONTAINER }}
@@ -294,13 +294,13 @@ jobs:
 
       - name: Set up OpenSearch
         if: ${{ inputs.enable_opensearch }}
-        uses: bisnow/.github/.github/actions/setup-opensearch@chore/refactor-actions
+        uses: bisnow/.github/.github/actions/setup-opensearch@v2
         with:
           container-name: ${{ env.OPENSEARCH_CONTAINER }}
 
       - name: Set up PostgreSQL
         if: ${{ inputs.enable_pgsql }}
-        uses: bisnow/.github/.github/actions/setup-pgsql@chore/refactor-actions
+        uses: bisnow/.github/.github/actions/setup-pgsql@v2
         with:
           use-docker: ${{ inputs.pgsql_use_docker }}
           container-name: ${{ env.PGSQL_CONTAINER }}
@@ -312,7 +312,7 @@ jobs:
           db-names: ${{ inputs.pgsql_db_names }}
 
       - name: Set up Redis
-        uses: bisnow/.github/.github/actions/setup-redis@chore/refactor-actions
+        uses: bisnow/.github/.github/actions/setup-redis@v2
         with:
           container-name: ${{ env.REDIS_CONTAINER }}
 
