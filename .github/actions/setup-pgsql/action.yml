@@ -1,0 +1,134 @@
+name: Set up PostgreSQL
+description: Start PostgreSQL (runner service or Docker), create user, databases, and import schemas
+
+inputs:
+  use-docker:
+    description: Use Docker container instead of runner service
+    required: false
+    default: 'false'
+  image:
+    description: Docker image (only used with use-docker)
+    required: false
+    default: 'postgres'
+  version:
+    description: Docker image version (only used with use-docker)
+    required: false
+    default: '16'
+  container-name:
+    description: Container name (only used with use-docker)
+    required: false
+    default: 'pgsql-test'
+  host:
+    description: Database host
+    required: false
+    default: '127.0.0.1'
+  port:
+    description: Database port
+    required: false
+    default: '5432'
+  username:
+    description: Database username
+    required: false
+    default: 'postgres'
+  password:
+    description: Database password
+    required: false
+    default: 'postgres'
+  db-name:
+    description: Primary database name
+    required: false
+    default: 'laravel'
+  db-names:
+    description: JSON array of additional database names
+    required: false
+    default: '[]'
+
+runs:
+  using: composite
+  steps:
+    - name: Validate database names
+      shell: bash
+      run: |
+        if ! echo '${{ inputs.db-names }}' | jq empty 2>/dev/null; then
+          echo "::error::Invalid JSON in db-names input: ${{ inputs.db-names }}"
+          exit 1
+        fi
+
+    - name: Start runner PostgreSQL service
+      if: inputs.use-docker != 'true'
+      shell: bash
+      run: |
+        sudo systemctl start postgresql.service
+        echo "Waiting for PostgreSQL to accept connections..."
+        timeout 30 sh -c 'until pg_isready -h ${{ inputs.host }} -p ${{ inputs.port }} 2>/dev/null; do sleep 1; done'
+
+    - name: Create user (runner service)
+      if: inputs.use-docker != 'true'
+      shell: bash
+      run: |
+        sudo -u postgres psql -c "CREATE USER ${{ inputs.username }} WITH PASSWORD '${{ inputs.password }}';" 2>/dev/null || \
+          sudo -u postgres psql -c "ALTER USER ${{ inputs.username }} WITH PASSWORD '${{ inputs.password }}';"
+
+    - name: Start Docker container
+      if: inputs.use-docker == 'true'
+      shell: bash
+      run: |
+        docker run -d \
+          --name ${{ inputs.container-name }} \
+          -e POSTGRES_USER=${{ inputs.username }} \
+          -e POSTGRES_PASSWORD=${{ inputs.password }} \
+          -p ${{ inputs.port }}:5432 \
+          --health-cmd="pg_isready -U ${{ inputs.username }}" \
+          --health-interval=10s \
+          --health-timeout=5s \
+          --health-retries=3 \
+          ${{ inputs.image }}:${{ inputs.version }}
+
+    - name: Wait for Docker healthy status
+      if: inputs.use-docker == 'true'
+      shell: bash
+      run: |
+        echo "Waiting for PostgreSQL to be healthy..."
+        timeout 60 sh -c 'until docker inspect --format="{{.State.Health.Status}}" ${{ inputs.container-name }} | grep -q healthy; do sleep 2; done'
+
+    - name: Create databases
+      shell: bash
+      env:
+        PGHOST: ${{ inputs.host }}
+        PGPORT: ${{ inputs.port }}
+        PGUSER: ${{ inputs.username }}
+        PGPASSWORD: ${{ inputs.password }}
+      run: |
+        echo "Creating primary database: ${{ inputs.db-name }}"
+        createdb --owner=${{ inputs.username }} "${{ inputs.db-name }}" 2>/dev/null || echo "Database ${{ inputs.db-name }} already exists"
+
+        for db_name in $(echo '${{ inputs.db-names }}' | jq -r '.[]'); do
+          echo "Creating additional database: $db_name"
+          createdb --owner=${{ inputs.username }} "$db_name" 2>/dev/null || echo "Database $db_name already exists"
+        done
+
+    - name: Import schemas
+      shell: bash
+      env:
+        PGHOST: ${{ inputs.host }}
+        PGPORT: ${{ inputs.port }}
+        PGUSER: ${{ inputs.username }}
+        PGPASSWORD: ${{ inputs.password }}
+      run: |
+        for schema_file in "database/schema/pgsql.sql" "database/schema/pgsql-schema.sql"; do
+          if [ -f "$schema_file" ]; then
+            echo "Importing schema: $schema_file"
+            psql -d "${{ inputs.db-name }}" -f "$schema_file"
+            break
+          fi
+        done
+
+        for db_name in $(echo '${{ inputs.db-names }}' | jq -r '.[]'); do
+          for schema_file in "database/schema/${db_name}.sql" "database/schema/${db_name}-schema.sql"; do
+            if [ -f "$schema_file" ]; then
+              echo "Importing schema: $schema_file"
+              psql -d "$db_name" -f "$schema_file"
+              break
+            fi
+          done
+        done
