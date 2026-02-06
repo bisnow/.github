@@ -42,7 +42,7 @@ runs:
     - name: Cache dependencies
       uses: actions/cache@v5
       with:
-        path: ~/.composer/cache/files
+        path: ${{ steps.composer-cache.outputs.dir }}
         key: ${{ runner.os }}-php${{ inputs.php-version }}-composer-${{ hashFiles('**/composer.lock') }}
         restore-keys: |
           ${{ runner.os }}-php${{ inputs.php-version }}-composer-
