@@ -2,6 +2,10 @@ name: Set up Node and npm
 description: Set up Node.js, cache dependencies, install, and build
 
 inputs:
+  build-script:
+    description: npm script to run for build (e.g. "build", "prod")
+    required: false
+    default: ''
   node-version-file:
     description: Path to node version file
     required: false
@@ -27,4 +31,15 @@ runs:
 
     - name: Build
       shell: bash
-      run: npm run build
+      run: |
+        if [ -n "${{ inputs.build-script }}" ]; then
+          echo "Running: npm run ${{ inputs.build-script }}"
+          npm run ${{ inputs.build-script }}
+        elif [ -f vite.config.js ] || [ -f vite.config.ts ]; then
+          npm run build
+        elif [ -f webpack.mix.js ]; then
+          npm run prod
+        else
+          echo "::error::Could not detect bundler (no vite.config.js, vite.config.ts, or webpack.mix.js). Set the build-script input explicitly."
+          exit 1
+        fi
