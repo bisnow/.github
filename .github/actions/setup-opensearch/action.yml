@@ -2,10 +2,6 @@ name: Set up OpenSearch
 description: Start OpenSearch container
 
 inputs:
-  wait:
-    description: Wait for service to be ready before continuing
-    required: false
-    default: 'true'
   version:
     description: Docker image version
     required: false
@@ -22,6 +18,10 @@ inputs:
     description: JVM heap options
     required: false
     default: '-Xms512m -Xmx512m'
+  wait:
+    description: Wait for service to be ready before continuing
+    required: false
+    default: 'true'
 
 runs:
   using: composite

@@ -2,10 +2,6 @@ name: Set up Redis
 description: Start Redis container
 
 inputs:
-  wait:
-    description: Wait for service to be ready before continuing
-    required: false
-    default: 'true'
   image:
     description: Docker image
     required: false
@@ -22,6 +18,10 @@ inputs:
     description: Port
     required: false
     default: '6379'
+  wait:
+    description: Wait for service to be ready before continuing
+    required: false
+    default: 'true'
 
 runs:
   using: composite

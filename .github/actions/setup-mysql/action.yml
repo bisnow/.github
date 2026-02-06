@@ -2,10 +2,6 @@ name: Set up MySQL
 description: Start MySQL (runner service or Docker), create databases, and import schemas
 
 inputs:
-  wait:
-    description: Wait for service to be ready before continuing
-    required: false
-    default: 'true'
   use-docker:
     description: Use Docker container instead of runner service
     required: false
@@ -46,6 +42,10 @@ inputs:
     description: JSON array of additional database names
     required: false
     default: '[]'
+  wait:
+    description: Wait for service to be ready before continuing
+    required: false
+    default: 'true'
 
 runs:
   using: composite
@@ -64,13 +64,6 @@ runs:
       shell: bash
       run: sudo systemctl start mysql.service
 
-    - name: Wait for runner MySQL service
-      if: inputs.wait == 'true' && inputs.use-docker != 'true'
-      shell: bash
-      run: |
-        echo "Waiting for MySQL to accept connections..."
-        timeout 30 sh -c 'until mysqladmin ping --host=${{ inputs.host }} --user=${{ inputs.username }} --password=${{ inputs.password }} --silent 2>/dev/null; do sleep 1; done'
-
     - name: Start Docker container
       if: inputs.use-docker == 'true'
       shell: bash
@@ -87,12 +80,17 @@ runs:
             ${{ inputs.image }}:${{ inputs.version }}
         fi
 
-    - name: Wait for Docker healthy status
-      if: inputs.wait == 'true' && inputs.use-docker == 'true'
+    - name: Wait for MySQL to be healthy
+      if: inputs.wait == 'true'
       shell: bash
       run: |
-        echo "Waiting for MySQL to be healthy..."
-        timeout 60 sh -c 'until docker inspect --format="{{.State.Health.Status}}" ${{ inputs.container-name }} | grep -q healthy; do sleep 2; done'
+        if [ "${{ inputs.use-docker }}" = "true" ]; then
+          echo "Waiting for MySQL to be healthy..."
+          timeout 60 sh -c 'until docker inspect --format="{{.State.Health.Status}}" ${{ inputs.container-name }} | grep -q healthy; do sleep 2; done'
+        else
+          echo "Waiting for MySQL to accept connections..."
+          timeout 30 sh -c 'until mysqladmin ping --host=${{ inputs.host }} --user=${{ inputs.username }} --password=${{ inputs.password }} --silent 2>/dev/null; do sleep 1; done'
+        fi
 
     - name: Create databases
       if: inputs.wait == 'true'
