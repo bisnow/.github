@@ -19,6 +19,7 @@ This repository contains shared configuration, reusable workflows, and composite
         - [Schema Imports](#schema-imports)
         - [Environment Variables](#environment-variables)
         - [Runner Service vs Docker](#runner-service-vs-docker)
+        - [Pipeline](#pipeline)
     - [Laravel Code Styling](#laravel-code-styling)
         - [Basic Usage](#basic-usage-1)
         - [With Flux Pro](#with-flux-pro-1)
@@ -364,6 +365,18 @@ Database actions support two modes:
 
 The runner service starts the pre-installed MySQL/PostgreSQL on the GitHub Actions runner. No image pull is required, which typically saves 20-30 seconds.
 
+#### Pipeline
+
+The workflow optimizes execution by overlapping service startup with language tool installation:
+
+| Phase | Steps                       | Description                                                        |
+|-------|-----------------------------|--------------------------------------------------------------------|
+| 1     | Start services              | Launch all containers and runner services with `wait: false`       |
+| 2     | Install PHP, Composer, Node | Install language tools while services initialize in the background |
+| 3     | Finish service setup        | Health checks pass instantly, then databases are created           |
+
+After setup completes, the workflow runs PHPStan static analysis followed by tests.
+
 ### Laravel Code Styling
 
 The `code-styling-laravel.yml` workflow automatically fixes code style using [Rector](https://getrector.com/) and [Laravel Pint](https://laravel.com/docs/pint), then commits the changes directly to the branch.
@@ -503,18 +516,19 @@ Starts MySQL, creates databases, and imports schema dumps.
 
 #### Inputs
 
-| Input            | Default      | Description                          |
-|------------------|--------------|--------------------------------------|
-| `use-docker`     | `false`      | Use Docker instead of runner service |
-| `image`          | `mysql`      | Docker image                         |
-| `version`        | `8.0.32`     | Docker image version                 |
-| `container-name` | `mysql-test` | Docker container name                |
-| `host`           | `127.0.0.1`  | Database host                        |
-| `port`           | `3306`       | Database port                        |
-| `username`       | `root`       | Database username                    |
-| `password`       | `root`       | Database password                    |
-| `db-name`        | `laravel`    | Primary database name                |
-| `db-names`       | `[]`         | JSON array of additional databases   |
+| Input            | Default      | Description                                    |
+|------------------|--------------|------------------------------------------------|
+| `wait`           | `true`       | Wait for service to be ready before continuing |
+| `use-docker`     | `false`      | Use Docker instead of runner service           |
+| `image`          | `mysql`      | Docker image                                   |
+| `version`        | `8.0.32`     | Docker image version                           |
+| `container-name` | `mysql-test` | Docker container name                          |
+| `host`           | `127.0.0.1`  | Database host                                  |
+| `port`           | `3306`       | Database port                                  |
+| `username`       | `root`       | Database username                              |
+| `password`       | `root`       | Database password                              |
+| `db-name`        | `laravel`    | Primary database name                          |
+| `db-names`       | `[]`         | JSON array of additional databases             |
 
 ### setup-opensearch
 
@@ -526,12 +540,13 @@ Starts an OpenSearch container configured for testing (single-node, security dis
 
 #### Inputs
 
-| Input            | Default             | Description           |
-|------------------|---------------------|-----------------------|
-| `version`        | `2.13.0`            | Docker image version  |
-| `container-name` | `opensearch-test`   | Docker container name |
-| `port`           | `9200`              | Port                  |
-| `java-opts`      | `-Xms512m -Xmx512m` | JVM heap options      |
+| Input            | Default             | Description                                    |
+|------------------|---------------------|------------------------------------------------|
+| `wait`           | `true`              | Wait for service to be ready before continuing |
+| `version`        | `2.13.0`            | Docker image version                           |
+| `container-name` | `opensearch-test`   | Docker container name                          |
+| `port`           | `9200`              | Port                                           |
+| `java-opts`      | `-Xms512m -Xmx512m` | JVM heap options                               |
 
 ### setup-pgsql
 
@@ -558,18 +573,19 @@ With a custom Docker image (e.g., pgvector):
 
 #### Inputs
 
-| Input            | Default      | Description                          |
-|------------------|--------------|--------------------------------------|
-| `use-docker`     | `false`      | Use Docker instead of runner service |
-| `image`          | `postgres`   | Docker image                         |
-| `version`        | `16`         | Docker image version                 |
-| `container-name` | `pgsql-test` | Docker container name                |
-| `host`           | `127.0.0.1`  | Database host                        |
-| `port`           | `5432`       | Database port                        |
-| `username`       | `postgres`   | Database username                    |
-| `password`       | `postgres`   | Database password                    |
-| `db-name`        | `laravel`    | Primary database name                |
-| `db-names`       | `[]`         | JSON array of additional databases   |
+| Input            | Default      | Description                                    |
+|------------------|--------------|------------------------------------------------|
+| `wait`           | `true`       | Wait for service to be ready before continuing |
+| `use-docker`     | `false`      | Use Docker instead of runner service           |
+| `image`          | `postgres`   | Docker image                                   |
+| `version`        | `16`         | Docker image version                           |
+| `container-name` | `pgsql-test` | Docker container name                          |
+| `host`           | `127.0.0.1`  | Database host                                  |
+| `port`           | `5432`       | Database port                                  |
+| `username`       | `postgres`   | Database username                              |
+| `password`       | `postgres`   | Database password                              |
+| `db-name`        | `laravel`    | Primary database name                          |
+| `db-names`       | `[]`         | JSON array of additional databases             |
 
 ### setup-php-composer
 
@@ -651,12 +667,13 @@ With a specific Redis image:
 
 #### Inputs
 
-| Input            | Default         | Description           |
-|------------------|-----------------|-----------------------|
-| `image`          | `valkey/valkey` | Docker image          |
-| `version`        | `alpine`        | Docker image version  |
-| `container-name` | `redis-test`    | Docker container name |
-| `port`           | `6379`          | Port                  |
+| Input            | Default         | Description                                    |
+|------------------|-----------------|------------------------------------------------|
+| `wait`           | `true`          | Wait for service to be ready before continuing |
+| `image`          | `valkey/valkey` | Docker image                                   |
+| `version`        | `alpine`        | Docker image version                           |
+| `container-name` | `redis-test`    | Docker container name                          |
+| `port`           | `6379`          | Port                                           |
 
 ## Shared Configuration
 

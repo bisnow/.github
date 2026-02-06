@@ -2,6 +2,10 @@ name: Set up PostgreSQL
 description: Start PostgreSQL (runner service or Docker), create user, databases, and import schemas
 
 inputs:
+  wait:
+    description: Wait for service to be ready before continuing
+    required: false
+    default: 'true'
   use-docker:
     description: Use Docker container instead of runner service
     required: false
@@ -47,6 +51,7 @@ runs:
   using: composite
   steps:
     - name: Validate database names
+      if: inputs.wait == 'true'
       shell: bash
       run: |
         if ! echo '${{ inputs.db-names }}' | jq empty 2>/dev/null; then
@@ -57,13 +62,17 @@ runs:
     - name: Start runner PostgreSQL service
       if: inputs.use-docker != 'true'
       shell: bash
+      run: sudo systemctl start postgresql.service
+
+    - name: Wait for runner PostgreSQL service
+      if: inputs.wait == 'true' && inputs.use-docker != 'true'
+      shell: bash
       run: |
-        sudo systemctl start postgresql.service
         echo "Waiting for PostgreSQL to accept connections..."
         timeout 30 sh -c 'until pg_isready -h ${{ inputs.host }} -p ${{ inputs.port }} 2>/dev/null; do sleep 1; done'
 
     - name: Create user (runner service)
-      if: inputs.use-docker != 'true'
+      if: inputs.wait == 'true' && inputs.use-docker != 'true'
       shell: bash
       run: |
         sudo -u postgres psql -c "CREATE USER ${{ inputs.username }} WITH PASSWORD '${{ inputs.password }}';" 2>/dev/null || \
@@ -73,25 +82,28 @@ runs:
       if: inputs.use-docker == 'true'
       shell: bash
       run: |
-        docker run -d \
-          --name ${{ inputs.container-name }} \
-          -e POSTGRES_USER=${{ inputs.username }} \
-          -e POSTGRES_PASSWORD=${{ inputs.password }} \
-          -p ${{ inputs.port }}:5432 \
-          --health-cmd="pg_isready -U ${{ inputs.username }}" \
-          --health-interval=10s \
-          --health-timeout=5s \
-          --health-retries=3 \
-          ${{ inputs.image }}:${{ inputs.version }}
+        if ! docker ps -a --format '{{.Names}}' | grep -qx '${{ inputs.container-name }}'; then
+          docker run -d \
+            --name ${{ inputs.container-name }} \
+            -e POSTGRES_USER=${{ inputs.username }} \
+            -e POSTGRES_PASSWORD=${{ inputs.password }} \
+            -p ${{ inputs.port }}:5432 \
+            --health-cmd="pg_isready -U ${{ inputs.username }}" \
+            --health-interval=10s \
+            --health-timeout=5s \
+            --health-retries=3 \
+            ${{ inputs.image }}:${{ inputs.version }}
+        fi
 
     - name: Wait for Docker healthy status
-      if: inputs.use-docker == 'true'
+      if: inputs.wait == 'true' && inputs.use-docker == 'true'
       shell: bash
       run: |
         echo "Waiting for PostgreSQL to be healthy..."
         timeout 60 sh -c 'until docker inspect --format="{{.State.Health.Status}}" ${{ inputs.container-name }} | grep -q healthy; do sleep 2; done'
 
     - name: Create databases
+      if: inputs.wait == 'true'
       shell: bash
       env:
         PGHOST: ${{ inputs.host }}
@@ -108,6 +120,7 @@ runs:
         done
 
     - name: Import schemas
+      if: inputs.wait == 'true'
       shell: bash
       env:
         PGHOST: ${{ inputs.host }}

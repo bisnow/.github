@@ -212,10 +212,11 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
 
-      # Services (alpha)
-      - name: Set up MySQL
+      # Start all services (without waiting)
+      - name: Start MySQL
         uses: bisnow/.github/.github/actions/setup-mysql@chore/refactor-actions
         with:
+          wait: false
           use-docker: ${{ inputs.mysql_use_docker }}
           image: ${{ inputs.mysql_image }}
           version: ${{ inputs.mysql_version }}
@@ -227,18 +228,20 @@ jobs:
           db-name: ${{ inputs.mysql_db_name }}
           db-names: ${{ inputs.mysql_db_names }}
 
-      - name: Set up OpenSearch
+      - name: Start OpenSearch
         if: ${{ inputs.enable_opensearch }}
         uses: bisnow/.github/.github/actions/setup-opensearch@chore/refactor-actions
         with:
+          wait: false
           version: ${{ inputs.opensearch_version }}
           container-name: ${{ env.OPENSEARCH_CONTAINER }}
           java-opts: ${{ inputs.opensearch_java_opts }}
 
-      - name: Set up PostgreSQL
+      - name: Start PostgreSQL
         if: ${{ inputs.enable_pgsql }}
         uses: bisnow/.github/.github/actions/setup-pgsql@chore/refactor-actions
         with:
+          wait: false
           use-docker: ${{ inputs.pgsql_use_docker }}
           image: ${{ inputs.pgsql_image }}
           version: ${{ inputs.pgsql_version }}
@@ -249,15 +252,16 @@ jobs:
           db-name: ${{ inputs.pgsql_db_name }}
           db-names: ${{ inputs.pgsql_db_names }}
 
-      - name: Set up Redis
+      - name: Start Redis
         uses: bisnow/.github/.github/actions/setup-redis@chore/refactor-actions
         with:
+          wait: false
           image: ${{ inputs.redis_image }}
           version: ${{ inputs.redis_version }}
           container-name: ${{ env.REDIS_CONTAINER }}
           port: ${{ env.REDIS_PORT }}
 
-      # Language and build tools
+      # Install language tools (while services initialize in background)
       - name: Set up PHP and Composer
         uses: bisnow/.github/.github/actions/setup-php-composer@chore/refactor-actions
         with:
@@ -274,6 +278,43 @@ jobs:
         with:
           build-script: ${{ inputs.node_build_script }}
           node-version-file: ${{ inputs.node_version_file }}
+
+      # Wait for services, create databases, and import schemas
+      - name: Set up MySQL
+        uses: bisnow/.github/.github/actions/setup-mysql@chore/refactor-actions
+        with:
+          use-docker: ${{ inputs.mysql_use_docker }}
+          container-name: ${{ env.MYSQL_CONTAINER }}
+          host: ${{ env.DB_HOST }}
+          port: ${{ env.DB_PORT }}
+          username: ${{ inputs.mysql_username }}
+          password: ${{ inputs.mysql_password }}
+          db-name: ${{ inputs.mysql_db_name }}
+          db-names: ${{ inputs.mysql_db_names }}
+
+      - name: Set up OpenSearch
+        if: ${{ inputs.enable_opensearch }}
+        uses: bisnow/.github/.github/actions/setup-opensearch@chore/refactor-actions
+        with:
+          container-name: ${{ env.OPENSEARCH_CONTAINER }}
+
+      - name: Set up PostgreSQL
+        if: ${{ inputs.enable_pgsql }}
+        uses: bisnow/.github/.github/actions/setup-pgsql@chore/refactor-actions
+        with:
+          use-docker: ${{ inputs.pgsql_use_docker }}
+          container-name: ${{ env.PGSQL_CONTAINER }}
+          host: ${{ env.DB_HOST }}
+          port: '5432'
+          username: ${{ inputs.pgsql_username }}
+          password: ${{ inputs.pgsql_password }}
+          db-name: ${{ inputs.pgsql_db_name }}
+          db-names: ${{ inputs.pgsql_db_names }}
+
+      - name: Set up Redis
+        uses: bisnow/.github/.github/actions/setup-redis@chore/refactor-actions
+        with:
+          container-name: ${{ env.REDIS_CONTAINER }}
 
       - name: Cache PHPStan results
         uses: actions/cache@v5

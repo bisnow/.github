@@ -2,6 +2,10 @@ name: Set up Redis
 description: Start Redis container
 
 inputs:
+  wait:
+    description: Wait for service to be ready before continuing
+    required: false
+    default: 'true'
   image:
     description: Docker image
     required: false
@@ -25,16 +29,19 @@ runs:
     - name: Start container
       shell: bash
       run: |
-        docker run -d \
-          --name ${{ inputs.container-name }} \
-          -p ${{ inputs.port }}:6379 \
-          --health-cmd="redis-cli ping" \
-          --health-interval=10s \
-          --health-timeout=5s \
-          --health-retries=3 \
-          ${{ inputs.image }}:${{ inputs.version }}
+        if ! docker ps -a --format '{{.Names}}' | grep -qx '${{ inputs.container-name }}'; then
+          docker run -d \
+            --name ${{ inputs.container-name }} \
+            -p ${{ inputs.port }}:6379 \
+            --health-cmd="redis-cli ping" \
+            --health-interval=10s \
+            --health-timeout=5s \
+            --health-retries=3 \
+            ${{ inputs.image }}:${{ inputs.version }}
+        fi
 
     - name: Wait for healthy status
+      if: inputs.wait == 'true'
       shell: bash
       run: |
         echo "Waiting for Redis to be healthy..."

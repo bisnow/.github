@@ -2,6 +2,10 @@ name: Set up MySQL
 description: Start MySQL (runner service or Docker), create databases, and import schemas
 
 inputs:
+  wait:
+    description: Wait for service to be ready before continuing
+    required: false
+    default: 'true'
   use-docker:
     description: Use Docker container instead of runner service
     required: false
@@ -47,6 +51,7 @@ runs:
   using: composite
   steps:
     - name: Validate database names
+      if: inputs.wait == 'true'
       shell: bash
       run: |
         if ! echo '${{ inputs.db-names }}' | jq empty 2>/dev/null; then
@@ -57,8 +62,12 @@ runs:
     - name: Start runner MySQL service
       if: inputs.use-docker != 'true'
       shell: bash
+      run: sudo systemctl start mysql.service
+
+    - name: Wait for runner MySQL service
+      if: inputs.wait == 'true' && inputs.use-docker != 'true'
+      shell: bash
       run: |
-        sudo systemctl start mysql.service
         echo "Waiting for MySQL to accept connections..."
         timeout 30 sh -c 'until mysqladmin ping --host=${{ inputs.host }} --user=${{ inputs.username }} --password=${{ inputs.password }} --silent 2>/dev/null; do sleep 1; done'
 
@@ -66,24 +75,27 @@ runs:
       if: inputs.use-docker == 'true'
       shell: bash
       run: |
-        docker run -d \
-          --name ${{ inputs.container-name }} \
-          -e MYSQL_ROOT_PASSWORD=${{ inputs.password }} \
-          -p ${{ inputs.port }}:3306 \
-          --health-cmd="mysqladmin ping --silent" \
-          --health-interval=10s \
-          --health-timeout=5s \
-          --health-retries=3 \
-          ${{ inputs.image }}:${{ inputs.version }}
+        if ! docker ps -a --format '{{.Names}}' | grep -qx '${{ inputs.container-name }}'; then
+          docker run -d \
+            --name ${{ inputs.container-name }} \
+            -e MYSQL_ROOT_PASSWORD=${{ inputs.password }} \
+            -p ${{ inputs.port }}:3306 \
+            --health-cmd="mysqladmin ping --silent" \
+            --health-interval=10s \
+            --health-timeout=5s \
+            --health-retries=3 \
+            ${{ inputs.image }}:${{ inputs.version }}
+        fi
 
     - name: Wait for Docker healthy status
-      if: inputs.use-docker == 'true'
+      if: inputs.wait == 'true' && inputs.use-docker == 'true'
       shell: bash
       run: |
         echo "Waiting for MySQL to be healthy..."
         timeout 60 sh -c 'until docker inspect --format="{{.State.Health.Status}}" ${{ inputs.container-name }} | grep -q healthy; do sleep 2; done'
 
     - name: Create databases
+      if: inputs.wait == 'true'
       shell: bash
       run: |
         echo "Creating primary database: ${{ inputs.db-name }}"
@@ -97,6 +109,7 @@ runs:
         done
 
     - name: Import schemas
+      if: inputs.wait == 'true'
       shell: bash
       run: |
         for schema_file in "database/schema/mysql.sql" "database/schema/mysql-schema.sql"; do
