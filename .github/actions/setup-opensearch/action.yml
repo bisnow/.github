@@ -50,6 +50,7 @@ runs:
 
     - name: Wait for healthy status
       if: inputs.wait == 'true'
-      uses: ./.github/actions/setup-opensearch/healthcheck
-      with:
-        container-name: ${{ inputs.container-name }}
+      shell: bash
+      run: |
+        echo "Waiting for OpenSearch to be healthy..."
+        timeout 60 sh -c 'until docker inspect --format="{{.State.Health.Status}}" ${{ inputs.container-name }} | grep -q healthy; do sleep 2; done'
