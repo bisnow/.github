@@ -7,6 +7,7 @@ permissions:
 on:
   workflow_call:
     inputs:
+      # Matrix
       php:
         description: 'JSON array of PHP versions for the matrix'
         required: false
@@ -22,36 +23,145 @@ on:
         required: false
         type: string
         default: '["prefer-stable"]'
+
+      # Feature flags
       enable_npm:
         description: 'Enable NPM install/build steps'
         required: false
         type: boolean
         default: false
-      db_username:
-        description: 'Database username for tests'
+      enable_opensearch:
+        description: 'Enable OpenSearch container'
+        required: false
+        type: boolean
+        default: false
+      enable_pgsql:
+        description: 'Enable PostgreSQL'
+        required: false
+        type: boolean
+        default: false
+
+      # MySQL
+      mysql_use_docker:
+        description: 'Use Docker for MySQL instead of runner service'
+        required: false
+        type: boolean
+        default: false
+      mysql_image:
+        description: 'MySQL Docker image (only used with mysql_use_docker)'
         required: false
         type: string
-        default: 'root'
-      db_password:
-        description: 'Database password for tests'
-        required: false
-        type: string
-        default: 'root'
-      db_name:
-        description: 'Primary database name (sets DB_DATABASE)'
-        required: false
-        type: string
-        default: 'laravel'
-      db_names:
-        description: 'JSON array of additional database names to create'
-        required: false
-        type: string
-        default: '[]'
+        default: 'mysql'
       mysql_version:
-        description: 'MySQL Docker image version'
+        description: 'MySQL Docker image version (only used with mysql_use_docker)'
         required: false
         type: string
         default: '8.0.32'
+      mysql_username:
+        description: 'MySQL username'
+        required: false
+        type: string
+        default: 'root'
+      mysql_password:
+        description: 'MySQL password'
+        required: false
+        type: string
+        default: 'root'
+      mysql_db_name:
+        description: 'Primary MySQL database name (sets DB_DATABASE)'
+        required: false
+        type: string
+        default: 'laravel'
+      mysql_db_names:
+        description: 'JSON array of additional MySQL database names'
+        required: false
+        type: string
+        default: '[]'
+
+      # Node
+      node_build_script:
+        description: 'npm script to run for build (auto-detects Vite/Mix by default)'
+        required: false
+        type: string
+        default: ''
+      node_version_file:
+        description: 'Path to node version file'
+        required: false
+        type: string
+        default: '.nvmrc'
+
+      # OpenSearch
+      opensearch_version:
+        description: 'OpenSearch Docker image version'
+        required: false
+        type: string
+        default: '2.13.0'
+      opensearch_java_opts:
+        description: 'OpenSearch JVM heap options'
+        required: false
+        type: string
+        default: '-Xms512m -Xmx512m'
+
+      # PostgreSQL
+      pgsql_use_docker:
+        description: 'Use Docker for PostgreSQL instead of runner service'
+        required: false
+        type: boolean
+        default: false
+      pgsql_image:
+        description: 'PostgreSQL Docker image (only used with pgsql_use_docker)'
+        required: false
+        type: string
+        default: 'postgres'
+      pgsql_version:
+        description: 'PostgreSQL Docker image version (only used with pgsql_use_docker)'
+        required: false
+        type: string
+        default: '16'
+      pgsql_username:
+        description: 'PostgreSQL username'
+        required: false
+        type: string
+        default: 'postgres'
+      pgsql_password:
+        description: 'PostgreSQL password'
+        required: false
+        type: string
+        default: 'postgres'
+      pgsql_db_name:
+        description: 'Primary PostgreSQL database name'
+        required: false
+        type: string
+        default: 'laravel'
+      pgsql_db_names:
+        description: 'JSON array of additional PostgreSQL database names'
+        required: false
+        type: string
+        default: '[]'
+
+      # PHP
+      php_extensions:
+        description: 'PHP extensions to install'
+        required: false
+        type: string
+        default: 'mbstring, dom, fileinfo, mysql'
+      php_coverage:
+        description: 'PHP coverage driver'
+        required: false
+        type: string
+        default: 'pcov'
+
+      # Redis
+      redis_image:
+        description: 'Redis Docker image'
+        required: false
+        type: string
+        default: 'valkey/valkey'
+      redis_version:
+        description: 'Redis Docker image version'
+        required: false
+        type: string
+        default: 'alpine'
     secrets:
       COMPOSER_OAUTH_GITHUB_ACTIONS:
         required: true
@@ -63,14 +173,16 @@ on:
 env:
   # Docker container names
   MYSQL_CONTAINER: mysql-test
+  OPENSEARCH_CONTAINER: opensearch-test
+  PGSQL_CONTAINER: pgsql-test
   REDIS_CONTAINER: redis-test
 
   # Database configuration
-  DB_DATABASE: ${{ inputs.db_name }}
+  DB_DATABASE: ${{ inputs.mysql_db_name }}
   DB_HOST: 127.0.0.1
-  DB_PASSWORD: ${{ inputs.db_password }}
+  DB_PASSWORD: ${{ inputs.mysql_password }}
   DB_PORT: 3306
-  DB_USERNAME: ${{ inputs.db_username }}
+  DB_USERNAME: ${{ inputs.mysql_username }}
 
   # Redis configuration
   REDIS_HOST: 127.0.0.1
@@ -100,35 +212,68 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
 
+      # Services (alpha)
       - name: Set up MySQL
-        uses: bisnow/.github/.github/actions/setup-mysql@v1.3.0
+        uses: bisnow/.github/.github/actions/setup-mysql@chore/refactor-actions
         with:
-          mysql-version: ${{ inputs.mysql_version }}
+          use-docker: ${{ inputs.mysql_use_docker }}
+          image: ${{ inputs.mysql_image }}
+          version: ${{ inputs.mysql_version }}
           container-name: ${{ env.MYSQL_CONTAINER }}
-          db-host: ${{ env.DB_HOST }}
-          db-port: ${{ env.DB_PORT }}
-          db-username: ${{ inputs.db_username }}
-          db-password: ${{ inputs.db_password }}
-          db-name: ${{ inputs.db_name }}
-          db-names: ${{ inputs.db_names }}
+          host: ${{ env.DB_HOST }}
+          port: ${{ env.DB_PORT }}
+          username: ${{ inputs.mysql_username }}
+          password: ${{ inputs.mysql_password }}
+          db-name: ${{ inputs.mysql_db_name }}
+          db-names: ${{ inputs.mysql_db_names }}
+
+      - name: Set up OpenSearch
+        if: ${{ inputs.enable_opensearch }}
+        uses: bisnow/.github/.github/actions/setup-opensearch@chore/refactor-actions
+        with:
+          version: ${{ inputs.opensearch_version }}
+          container-name: ${{ env.OPENSEARCH_CONTAINER }}
+          java-opts: ${{ inputs.opensearch_java_opts }}
+
+      - name: Set up PostgreSQL
+        if: ${{ inputs.enable_pgsql }}
+        uses: bisnow/.github/.github/actions/setup-pgsql@chore/refactor-actions
+        with:
+          use-docker: ${{ inputs.pgsql_use_docker }}
+          image: ${{ inputs.pgsql_image }}
+          version: ${{ inputs.pgsql_version }}
+          container-name: ${{ env.PGSQL_CONTAINER }}
+          host: ${{ env.DB_HOST }}
+          username: ${{ inputs.pgsql_username }}
+          password: ${{ inputs.pgsql_password }}
+          db-name: ${{ inputs.pgsql_db_name }}
+          db-names: ${{ inputs.pgsql_db_names }}
 
       - name: Set up Redis
-        uses: bisnow/.github/.github/actions/setup-redis@v1.3.0
+        uses: bisnow/.github/.github/actions/setup-redis@chore/refactor-actions
         with:
+          image: ${{ inputs.redis_image }}
+          version: ${{ inputs.redis_version }}
           container-name: ${{ env.REDIS_CONTAINER }}
           port: ${{ env.REDIS_PORT }}
 
+      # Language and build tools
       - name: Set up PHP and Composer
-        uses: bisnow/.github/.github/actions/setup-php-composer@v1.3.0
+        uses: bisnow/.github/.github/actions/setup-php-composer@chore/refactor-actions
         with:
           php-version: ${{ matrix.php }}
+          extensions: ${{ inputs.php_extensions }}
+          coverage: ${{ inputs.php_coverage }}
           composer-oauth-token: ${{ secrets.COMPOSER_OAUTH_GITHUB_ACTIONS }}
           flux-username: ${{ secrets.FLUX_USERNAME }}
           flux-password: ${{ secrets.FLUX_PASSWORD }}
 
       - name: Set up Node and npm
         if: ${{ inputs.enable_npm }}
-        uses: bisnow/.github/.github/actions/setup-node-npm@v1.3.0
+        uses: bisnow/.github/.github/actions/setup-node-npm@chore/refactor-actions
+        with:
+          build-script: ${{ inputs.node_build_script }}
+          node-version-file: ${{ inputs.node_version_file }}
 
       - name: Cache PHPStan results
         uses: actions/cache@v5
@@ -158,5 +303,5 @@ jobs:
       - name: Stop containers
         if: always()
         run: |
-          docker stop ${MYSQL_CONTAINER} ${REDIS_CONTAINER} || true
-          docker rm ${MYSQL_CONTAINER} ${REDIS_CONTAINER} || true
+          docker stop ${MYSQL_CONTAINER} ${OPENSEARCH_CONTAINER} ${PGSQL_CONTAINER} ${REDIS_CONTAINER} || true
+          docker rm ${MYSQL_CONTAINER} ${OPENSEARCH_CONTAINER} ${PGSQL_CONTAINER} ${REDIS_CONTAINER} || true
