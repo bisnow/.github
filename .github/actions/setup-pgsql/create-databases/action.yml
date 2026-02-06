@@ -10,6 +10,10 @@ inputs:
     description: Database host
     required: false
     default: '127.0.0.1'
+  port:
+    description: Database port
+    required: false
+    default: '5432'
   username:
     description: Database username
     required: false
@@ -41,7 +45,7 @@ runs:
       shell: bash
       env:
         PGHOST: ${{ inputs.host }}
-        PGPORT: 5432
+        PGPORT: ${{ inputs.port }}
         PGUSER: ${{ inputs.username }}
         PGPASSWORD: ${{ inputs.password }}
       run: |

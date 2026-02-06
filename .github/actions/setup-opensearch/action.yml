@@ -29,22 +29,24 @@ runs:
     - name: Start container
       shell: bash
       run: |
-        docker run -d \
-          --name ${{ inputs.container-name }} \
-          -e node.name=es01 \
-          -e cluster.name=es-docker-cluster \
-          -e discovery.type=single-node \
-          -e bootstrap.memory_lock=true \
-          -e http.compression=true \
-          -e http.port=9200 \
-          -e plugins.security.disabled=true \
-          -e "ES_JAVA_OPTS=${{ inputs.java-opts }}" \
-          -p ${{ inputs.port }}:9200 \
-          --health-cmd="curl -f http://localhost:9200/_cluster/health || exit 1" \
-          --health-interval=10s \
-          --health-timeout=5s \
-          --health-retries=3 \
-          opensearchproject/opensearch:${{ inputs.version }}
+        if ! docker ps -a --format '{{.Names}}' | grep -qx '${{ inputs.container-name }}'; then
+          docker run -d \
+            --name ${{ inputs.container-name }} \
+            -e node.name=es01 \
+            -e cluster.name=es-docker-cluster \
+            -e discovery.type=single-node \
+            -e bootstrap.memory_lock=true \
+            -e http.compression=true \
+            -e http.port=9200 \
+            -e plugins.security.disabled=true \
+            -e "ES_JAVA_OPTS=${{ inputs.java-opts }}" \
+            -p ${{ inputs.port }}:9200 \
+            --health-cmd="curl -f http://localhost:9200/_cluster/health || exit 1" \
+            --health-interval=10s \
+            --health-timeout=5s \
+            --health-retries=3 \
+            opensearchproject/opensearch:${{ inputs.version }}
+        fi
 
     - name: Wait for healthy status
       if: inputs.wait == 'true'

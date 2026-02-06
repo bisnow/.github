@@ -61,34 +61,24 @@ runs:
     - name: Start runner PostgreSQL service
       if: inputs.use-docker != 'true'
       shell: bash
-      run: |
-        sudo systemctl start postgresql.service
-        if [ "${{ inputs.wait }}" = "true" ]; then
-          echo "Waiting for PostgreSQL to accept connections..."
-          timeout 30 sh -c 'until pg_isready -h ${{ inputs.host }} -p ${{ inputs.port }} 2>/dev/null; do sleep 1; done'
-        fi
-
-    - name: Create user (runner service)
-      if: inputs.use-docker != 'true' && inputs.wait == 'true'
-      shell: bash
-      run: |
-        sudo -u postgres psql -c "CREATE USER ${{ inputs.username }} WITH PASSWORD '${{ inputs.password }}';" 2>/dev/null || \
-          sudo -u postgres psql -c "ALTER USER ${{ inputs.username }} WITH PASSWORD '${{ inputs.password }}';"
+      run: sudo systemctl start postgresql.service
 
     - name: Start Docker container
       if: inputs.use-docker == 'true'
       shell: bash
       run: |
-        docker run -d \
-          --name ${{ inputs.container-name }} \
-          -e POSTGRES_USER=${{ inputs.username }} \
-          -e POSTGRES_PASSWORD=${{ inputs.password }} \
-          -p ${{ inputs.port }}:5432 \
-          --health-cmd="pg_isready -U ${{ inputs.username }}" \
-          --health-interval=10s \
-          --health-timeout=5s \
-          --health-retries=3 \
-          ${{ inputs.image }}:${{ inputs.version }}
+        if ! docker ps -a --format '{{.Names}}' | grep -qx '${{ inputs.container-name }}'; then
+          docker run -d \
+            --name ${{ inputs.container-name }} \
+            -e POSTGRES_USER=${{ inputs.username }} \
+            -e POSTGRES_PASSWORD=${{ inputs.password }} \
+            -p ${{ inputs.port }}:5432 \
+            --health-cmd="pg_isready -U ${{ inputs.username }}" \
+            --health-interval=10s \
+            --health-timeout=5s \
+            --health-retries=3 \
+            ${{ inputs.image }}:${{ inputs.version }}
+        fi
 
     - name: Wait for PostgreSQL to be healthy
       if: inputs.wait == 'true'
@@ -97,6 +87,7 @@ runs:
         use-docker: ${{ inputs.use-docker }}
         container-name: ${{ inputs.container-name }}
         host: ${{ inputs.host }}
+        port: ${{ inputs.port }}
 
     - name: Create databases
       if: inputs.wait == 'true'
@@ -104,6 +95,7 @@ runs:
       with:
         use-docker: ${{ inputs.use-docker }}
         host: ${{ inputs.host }}
+        port: ${{ inputs.port }}
         username: ${{ inputs.username }}
         password: ${{ inputs.password }}
         db-name: ${{ inputs.db-name }}
@@ -114,6 +106,7 @@ runs:
       uses: ./.github/actions/setup-pgsql/import-schemas
       with:
         host: ${{ inputs.host }}
+        port: ${{ inputs.port }}
         username: ${{ inputs.username }}
         password: ${{ inputs.password }}
         db-name: ${{ inputs.db-name }}

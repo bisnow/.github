@@ -29,14 +29,16 @@ runs:
     - name: Start container
       shell: bash
       run: |
-        docker run -d \
-          --name ${{ inputs.container-name }} \
-          -p ${{ inputs.port }}:6379 \
-          --health-cmd="redis-cli ping" \
-          --health-interval=10s \
-          --health-timeout=5s \
-          --health-retries=3 \
-          ${{ inputs.image }}:${{ inputs.version }}
+        if ! docker ps -a --format '{{.Names}}' | grep -qx '${{ inputs.container-name }}'; then
+          docker run -d \
+            --name ${{ inputs.container-name }} \
+            -p ${{ inputs.port }}:6379 \
+            --health-cmd="redis-cli ping" \
+            --health-interval=10s \
+            --health-timeout=5s \
+            --health-retries=3 \
+            ${{ inputs.image }}:${{ inputs.version }}
+        fi
 
     - name: Wait for healthy status
       if: inputs.wait == 'true'

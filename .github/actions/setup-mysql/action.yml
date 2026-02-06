@@ -61,26 +61,23 @@ runs:
     - name: Start runner MySQL service
       if: inputs.use-docker != 'true'
       shell: bash
-      run: |
-        sudo systemctl start mysql.service
-        if [ "${{ inputs.wait }}" = "true" ]; then
-          echo "Waiting for MySQL to accept connections..."
-          timeout 30 sh -c 'until mysqladmin ping --host=${{ inputs.host }} --user=${{ inputs.username }} --password=${{ inputs.password }} --silent 2>/dev/null; do sleep 1; done'
-        fi
+      run: sudo systemctl start mysql.service
 
     - name: Start Docker container
       if: inputs.use-docker == 'true'
       shell: bash
       run: |
-        docker run -d \
-          --name ${{ inputs.container-name }} \
-          -e MYSQL_ROOT_PASSWORD=${{ inputs.password }} \
-          -p ${{ inputs.port }}:3306 \
-          --health-cmd="mysqladmin ping --silent" \
-          --health-interval=10s \
-          --health-timeout=5s \
-          --health-retries=3 \
-          ${{ inputs.image }}:${{ inputs.version }}
+        if ! docker ps -a --format '{{.Names}}' | grep -qx '${{ inputs.container-name }}'; then
+          docker run -d \
+            --name ${{ inputs.container-name }} \
+            -e MYSQL_ROOT_PASSWORD=${{ inputs.password }} \
+            -p ${{ inputs.port }}:3306 \
+            --health-cmd="mysqladmin ping --silent" \
+            --health-interval=10s \
+            --health-timeout=5s \
+            --health-retries=3 \
+            ${{ inputs.image }}:${{ inputs.version }}
+        fi
 
     - name: Wait for MySQL to be healthy
       if: inputs.wait == 'true'
