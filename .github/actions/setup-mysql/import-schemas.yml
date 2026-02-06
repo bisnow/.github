@@ -1,0 +1,48 @@
+name: MySQL Import Schemas
+description: Import MySQL database schemas
+
+inputs:
+  host:
+    description: Database host
+    required: false
+    default: '127.0.0.1'
+  username:
+    description: Database username
+    required: false
+    default: 'root'
+  password:
+    description: Database password
+    required: false
+    default: 'root'
+  db-name:
+    description: Primary database name
+    required: false
+    default: 'laravel'
+  db-names:
+    description: JSON array of additional database names
+    required: false
+    default: '[]'
+
+runs:
+  using: composite
+  steps:
+    - name: Import schemas
+      shell: bash
+      run: |
+        for schema_file in "database/schema/mysql.sql" "database/schema/mysql-schema.sql"; do
+          if [ -f "$schema_file" ]; then
+            echo "Importing schema: $schema_file"
+            mysql --host=${{ inputs.host }} --user=${{ inputs.username }} --password=${{ inputs.password }} "${{ inputs.db-name }}" < "$schema_file"
+            break
+          fi
+        done
+
+        for db_name in $(echo '${{ inputs.db-names }}' | jq -r '.[]'); do
+          for schema_file in "database/schema/${db_name}.sql" "database/schema/${db_name}-schema.sql"; do
+            if [ -f "$schema_file" ]; then
+              echo "Importing schema: $schema_file"
+              mysql --host=${{ inputs.host }} --user=${{ inputs.username }} --password=${{ inputs.password }} "$db_name" < "$schema_file"
+              break
+            fi
+          done
+        done

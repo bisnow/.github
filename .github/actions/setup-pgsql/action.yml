@@ -2,10 +2,6 @@ name: Set up PostgreSQL
 description: Start PostgreSQL (runner service or Docker), create user, databases, and import schemas
 
 inputs:
-  wait:
-    description: Wait for service to be ready before continuing
-    required: false
-    default: 'true'
   use-docker:
     description: Use Docker container instead of runner service
     required: false
@@ -46,12 +42,15 @@ inputs:
     description: JSON array of additional database names
     required: false
     default: '[]'
+  wait:
+    description: Wait for service to be ready before continuing
+    required: false
+    default: 'true'
 
 runs:
   using: composite
   steps:
     - name: Validate database names
-      if: inputs.wait == 'true'
       shell: bash
       run: |
         if ! echo '${{ inputs.db-names }}' | jq empty 2>/dev/null; then
@@ -62,17 +61,15 @@ runs:
     - name: Start runner PostgreSQL service
       if: inputs.use-docker != 'true'
       shell: bash
-      run: sudo systemctl start postgresql.service
-
-    - name: Wait for runner PostgreSQL service
-      if: inputs.wait == 'true' && inputs.use-docker != 'true'
-      shell: bash
       run: |
-        echo "Waiting for PostgreSQL to accept connections..."
-        timeout 30 sh -c 'until pg_isready -h ${{ inputs.host }} -p ${{ inputs.port }} 2>/dev/null; do sleep 1; done'
+        sudo systemctl start postgresql.service
+        if [ "${{ inputs.wait }}" = "true" ]; then
+          echo "Waiting for PostgreSQL to accept connections..."
+          timeout 30 sh -c 'until pg_isready -h ${{ inputs.host }} -p ${{ inputs.port }} 2>/dev/null; do sleep 1; done'
+        fi
 
     - name: Create user (runner service)
-      if: inputs.wait == 'true' && inputs.use-docker != 'true'
+      if: inputs.use-docker != 'true' && inputs.wait == 'true'
       shell: bash
       run: |
         sudo -u postgres psql -c "CREATE USER ${{ inputs.username }} WITH PASSWORD '${{ inputs.password }}';" 2>/dev/null || \
@@ -82,66 +79,42 @@ runs:
       if: inputs.use-docker == 'true'
       shell: bash
       run: |
-        if ! docker ps -a --format '{{.Names}}' | grep -qx '${{ inputs.container-name }}'; then
-          docker run -d \
-            --name ${{ inputs.container-name }} \
-            -e POSTGRES_USER=${{ inputs.username }} \
-            -e POSTGRES_PASSWORD=${{ inputs.password }} \
-            -p ${{ inputs.port }}:5432 \
-            --health-cmd="pg_isready -U ${{ inputs.username }}" \
-            --health-interval=10s \
-            --health-timeout=5s \
-            --health-retries=3 \
-            ${{ inputs.image }}:${{ inputs.version }}
-        fi
+        docker run -d \
+          --name ${{ inputs.container-name }} \
+          -e POSTGRES_USER=${{ inputs.username }} \
+          -e POSTGRES_PASSWORD=${{ inputs.password }} \
+          -p ${{ inputs.port }}:5432 \
+          --health-cmd="pg_isready -U ${{ inputs.username }}" \
+          --health-interval=10s \
+          --health-timeout=5s \
+          --health-retries=3 \
+          ${{ inputs.image }}:${{ inputs.version }}
 
-    - name: Wait for Docker healthy status
-      if: inputs.wait == 'true' && inputs.use-docker == 'true'
-      shell: bash
-      run: |
-        echo "Waiting for PostgreSQL to be healthy..."
-        timeout 60 sh -c 'until docker inspect --format="{{.State.Health.Status}}" ${{ inputs.container-name }} | grep -q healthy; do sleep 2; done'
+    - name: Wait for PostgreSQL to be healthy
+      if: inputs.wait == 'true'
+      uses: ./.github/actions/setup-pgsql/healthcheck
+      with:
+        use-docker: ${{ inputs.use-docker }}
+        container-name: ${{ inputs.container-name }}
+        host: ${{ inputs.host }}
 
     - name: Create databases
       if: inputs.wait == 'true'
-      shell: bash
-      env:
-        PGHOST: ${{ inputs.host }}
-        PGPORT: ${{ inputs.port }}
-        PGUSER: ${{ inputs.username }}
-        PGPASSWORD: ${{ inputs.password }}
-      run: |
-        echo "Creating primary database: ${{ inputs.db-name }}"
-        createdb --owner=${{ inputs.username }} "${{ inputs.db-name }}" 2>/dev/null || echo "Database ${{ inputs.db-name }} already exists"
-
-        for db_name in $(echo '${{ inputs.db-names }}' | jq -r '.[]'); do
-          echo "Creating additional database: $db_name"
-          createdb --owner=${{ inputs.username }} "$db_name" 2>/dev/null || echo "Database $db_name already exists"
-        done
+      uses: ./.github/actions/setup-pgsql/create-databases
+      with:
+        use-docker: ${{ inputs.use-docker }}
+        host: ${{ inputs.host }}
+        username: ${{ inputs.username }}
+        password: ${{ inputs.password }}
+        db-name: ${{ inputs.db-name }}
+        db-names: ${{ inputs.db-names }}
 
     - name: Import schemas
       if: inputs.wait == 'true'
-      shell: bash
-      env:
-        PGHOST: ${{ inputs.host }}
-        PGPORT: ${{ inputs.port }}
-        PGUSER: ${{ inputs.username }}
-        PGPASSWORD: ${{ inputs.password }}
-      run: |
-        for schema_file in "database/schema/pgsql.sql" "database/schema/pgsql-schema.sql"; do
-          if [ -f "$schema_file" ]; then
-            echo "Importing schema: $schema_file"
-            psql -d "${{ inputs.db-name }}" -f "$schema_file"
-            break
-          fi
-        done
-
-        for db_name in $(echo '${{ inputs.db-names }}' | jq -r '.[]'); do
-          for schema_file in "database/schema/${db_name}.sql" "database/schema/${db_name}-schema.sql"; do
-            if [ -f "$schema_file" ]; then
-              echo "Importing schema: $schema_file"
-              psql -d "$db_name" -f "$schema_file"
-              break
-            fi
-          done
-        done
+      uses: ./.github/actions/setup-pgsql/import-schemas
+      with:
+        host: ${{ inputs.host }}
+        username: ${{ inputs.username }}
+        password: ${{ inputs.password }}
+        db-name: ${{ inputs.db-name }}
+        db-names: ${{ inputs.db-names }}

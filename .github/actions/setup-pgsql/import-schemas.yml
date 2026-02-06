@@ -1,0 +1,53 @@
+name: PostgreSQL Import Schemas
+description: Import PostgreSQL database schemas
+
+inputs:
+  host:
+    description: Database host
+    required: false
+    default: '127.0.0.1'
+  username:
+    description: Database username
+    required: false
+    default: 'postgres'
+  password:
+    description: Database password
+    required: false
+    default: 'postgres'
+  db-name:
+    description: Primary database name
+    required: false
+    default: 'laravel'
+  db-names:
+    description: JSON array of additional database names
+    required: false
+    default: '[]'
+
+runs:
+  using: composite
+  steps:
+    - name: Import schemas
+      shell: bash
+      env:
+        PGHOST: ${{ inputs.host }}
+        PGPORT: 5432
+        PGUSER: ${{ inputs.username }}
+        PGPASSWORD: ${{ inputs.password }}
+      run: |
+        for schema_file in "database/schema/pgsql.sql" "database/schema/pgsql-schema.sql"; do
+          if [ -f "$schema_file" ]; then
+            echo "Importing schema: $schema_file"
+            psql -d "${{ inputs.db-name }}" -f "$schema_file"
+            break
+          fi
+        done
+
+        for db_name in $(echo '${{ inputs.db-names }}' | jq -r '.[]'); do
+          for schema_file in "database/schema/${db_name}.sql" "database/schema/${db_name}-schema.sql"; do
+            if [ -f "$schema_file" ]; then
+              echo "Importing schema: $schema_file"
+              psql -d "$db_name" -f "$schema_file"
+              break
+            fi
+          done
+        done

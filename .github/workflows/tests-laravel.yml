@@ -212,11 +212,12 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
 
-      # Start all services (without waiting)
-      - name: Start MySQL
-        uses: bisnow/.github/.github/actions/setup-mysql@chore/refactor-actions
+      # ###########################################################################
+      # Services - Start all containers first (without waiting)
+      # ###########################################################################
+      - name: Set up MySQL
+        uses: bisnow/.github/.github/actions/setup-mysql@chore/refactor-actions-speed
         with:
-          wait: false
           use-docker: ${{ inputs.mysql_use_docker }}
           image: ${{ inputs.mysql_image }}
           version: ${{ inputs.mysql_version }}
@@ -227,21 +228,21 @@ jobs:
           password: ${{ inputs.mysql_password }}
           db-name: ${{ inputs.mysql_db_name }}
           db-names: ${{ inputs.mysql_db_names }}
-
-      - name: Start OpenSearch
-        if: ${{ inputs.enable_opensearch }}
-        uses: bisnow/.github/.github/actions/setup-opensearch@chore/refactor-actions
-        with:
           wait: false
+
+      - name: Set up OpenSearch
+        if: ${{ inputs.enable_opensearch }}
+        uses: bisnow/.github/.github/actions/setup-opensearch@chore/refactor-actions-speed
+        with:
           version: ${{ inputs.opensearch_version }}
           container-name: ${{ env.OPENSEARCH_CONTAINER }}
           java-opts: ${{ inputs.opensearch_java_opts }}
-
-      - name: Start PostgreSQL
-        if: ${{ inputs.enable_pgsql }}
-        uses: bisnow/.github/.github/actions/setup-pgsql@chore/refactor-actions
-        with:
           wait: false
+
+      - name: Set up PostgreSQL
+        if: ${{ inputs.enable_pgsql }}
+        uses: bisnow/.github/.github/actions/setup-pgsql@chore/refactor-actions-speed
+        with:
           use-docker: ${{ inputs.pgsql_use_docker }}
           image: ${{ inputs.pgsql_image }}
           version: ${{ inputs.pgsql_version }}
@@ -251,19 +252,22 @@ jobs:
           password: ${{ inputs.pgsql_password }}
           db-name: ${{ inputs.pgsql_db_name }}
           db-names: ${{ inputs.pgsql_db_names }}
-
-      - name: Start Redis
-        uses: bisnow/.github/.github/actions/setup-redis@chore/refactor-actions
-        with:
           wait: false
+
+      - name: Set up Redis
+        uses: bisnow/.github/.github/actions/setup-redis@chore/refactor-actions-speed
+        with:
           image: ${{ inputs.redis_image }}
           version: ${{ inputs.redis_version }}
           container-name: ${{ env.REDIS_CONTAINER }}
           port: ${{ env.REDIS_PORT }}
+          wait: false
 
-      # Install language tools (while services initialize in background)
+      # ###########################################################################
+      # Language and build tools (run while services initialize in background)
+      # ###########################################################################
       - name: Set up PHP and Composer
-        uses: bisnow/.github/.github/actions/setup-php-composer@chore/refactor-actions
+        uses: bisnow/.github/.github/actions/setup-php-composer@chore/refactor-actions-speed
         with:
           php-version: ${{ matrix.php }}
           extensions: ${{ inputs.php_extensions }}
@@ -274,48 +278,87 @@ jobs:
 
       - name: Set up Node and npm
         if: ${{ inputs.enable_npm }}
-        uses: bisnow/.github/.github/actions/setup-node-npm@chore/refactor-actions
+        uses: bisnow/.github/.github/actions/setup-node-npm@chore/refactor-actions-speed
         with:
           build-script: ${{ inputs.node_build_script }}
           node-version-file: ${{ inputs.node_version_file }}
 
-      # Wait for services, create databases, and import schemas
-      - name: Set up MySQL
-        uses: bisnow/.github/.github/actions/setup-mysql@chore/refactor-actions
+      # ###########################################################################
+      # Wait for all services to be healthy
+      # ###########################################################################
+      - name: Wait for MySQL
+        uses: bisnow/.github/.github/actions/setup-mysql/healthcheck@chore/refactor-actions-speed
         with:
           use-docker: ${{ inputs.mysql_use_docker }}
           container-name: ${{ env.MYSQL_CONTAINER }}
           host: ${{ env.DB_HOST }}
-          port: ${{ env.DB_PORT }}
+          username: ${{ inputs.mysql_username }}
+          password: ${{ inputs.mysql_password }}
+
+      - name: Wait for OpenSearch
+        if: ${{ inputs.enable_opensearch }}
+        uses: bisnow/.github/.github/actions/setup-opensearch/healthcheck@chore/refactor-actions-speed
+        with:
+          container-name: ${{ env.OPENSEARCH_CONTAINER }}
+
+      - name: Wait for PostgreSQL
+        if: ${{ inputs.enable_pgsql }}
+        uses: bisnow/.github/.github/actions/setup-pgsql/healthcheck@chore/refactor-actions-speed
+        with:
+          use-docker: ${{ inputs.pgsql_use_docker }}
+          container-name: ${{ env.PGSQL_CONTAINER }}
+          host: ${{ env.DB_HOST }}
+
+      - name: Wait for Redis
+        uses: bisnow/.github/.github/actions/setup-redis/healthcheck@chore/refactor-actions-speed
+        with:
+          container-name: ${{ env.REDIS_CONTAINER }}
+
+      # ###########################################################################
+      # Initialize databases
+      # ###########################################################################
+      - name: Create MySQL databases
+        uses: bisnow/.github/.github/actions/setup-mysql/create-databases@chore/refactor-actions-speed
+        with:
+          host: ${{ env.DB_HOST }}
           username: ${{ inputs.mysql_username }}
           password: ${{ inputs.mysql_password }}
           db-name: ${{ inputs.mysql_db_name }}
           db-names: ${{ inputs.mysql_db_names }}
 
-      - name: Set up OpenSearch
-        if: ${{ inputs.enable_opensearch }}
-        uses: bisnow/.github/.github/actions/setup-opensearch@chore/refactor-actions
+      - name: Import MySQL schemas
+        uses: bisnow/.github/.github/actions/setup-mysql/import-schemas@chore/refactor-actions-speed
         with:
-          container-name: ${{ env.OPENSEARCH_CONTAINER }}
+          host: ${{ env.DB_HOST }}
+          username: ${{ inputs.mysql_username }}
+          password: ${{ inputs.mysql_password }}
+          db-name: ${{ inputs.mysql_db_name }}
+          db-names: ${{ inputs.mysql_db_names }}
 
-      - name: Set up PostgreSQL
+      - name: Create PostgreSQL databases
         if: ${{ inputs.enable_pgsql }}
-        uses: bisnow/.github/.github/actions/setup-pgsql@chore/refactor-actions
+        uses: bisnow/.github/.github/actions/setup-pgsql/create-databases@chore/refactor-actions-speed
         with:
           use-docker: ${{ inputs.pgsql_use_docker }}
-          container-name: ${{ env.PGSQL_CONTAINER }}
           host: ${{ env.DB_HOST }}
-          port: '5432'
           username: ${{ inputs.pgsql_username }}
           password: ${{ inputs.pgsql_password }}
           db-name: ${{ inputs.pgsql_db_name }}
           db-names: ${{ inputs.pgsql_db_names }}
 
-      - name: Set up Redis
-        uses: bisnow/.github/.github/actions/setup-redis@chore/refactor-actions
+      - name: Import PostgreSQL schemas
+        if: ${{ inputs.enable_pgsql }}
+        uses: bisnow/.github/.github/actions/setup-pgsql/import-schemas@chore/refactor-actions-speed
         with:
-          container-name: ${{ env.REDIS_CONTAINER }}
+          host: ${{ env.DB_HOST }}
+          username: ${{ inputs.pgsql_username }}
+          password: ${{ inputs.pgsql_password }}
+          db-name: ${{ inputs.pgsql_db_name }}
+          db-names: ${{ inputs.pgsql_db_names }}
 
+      # ###########################################################################
+      # PHPStan cache
+      # ###########################################################################
       - name: Cache PHPStan results
         uses: actions/cache@v5
         with:
