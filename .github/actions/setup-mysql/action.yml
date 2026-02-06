@@ -1,28 +1,36 @@
 name: Set up MySQL
-description: Start MySQL container, create databases, and import schemas
+description: Start MySQL (runner service or Docker), create databases, and import schemas
 
 inputs:
-  mysql-version:
-    description: MySQL Docker image version
+  use-docker:
+    description: Use Docker container instead of runner service
+    required: false
+    default: 'false'
+  image:
+    description: Docker image (only used with use-docker)
+    required: false
+    default: 'mysql'
+  version:
+    description: Docker image version (only used with use-docker)
     required: false
     default: '8.0.32'
   container-name:
-    description: Container name
+    description: Container name (only used with use-docker)
     required: false
     default: 'mysql-test'
-  db-host:
+  host:
     description: Database host
     required: false
     default: '127.0.0.1'
-  db-port:
+  port:
     description: Database port
     required: false
     default: '3306'
-  db-username:
+  username:
     description: Database username
     required: false
     default: 'root'
-  db-password:
+  password:
     description: Database password
     required: false
     default: 'root'
@@ -38,20 +46,38 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Start container
+    - name: Validate database names
+      shell: bash
+      run: |
+        if ! echo '${{ inputs.db-names }}' | jq empty 2>/dev/null; then
+          echo "::error::Invalid JSON in db-names input: ${{ inputs.db-names }}"
+          exit 1
+        fi
+
+    - name: Start runner MySQL service
+      if: inputs.use-docker != 'true'
+      shell: bash
+      run: |
+        sudo systemctl start mysql.service
+        echo "Waiting for MySQL to accept connections..."
+        timeout 30 sh -c 'until mysqladmin ping --host=${{ inputs.host }} --user=${{ inputs.username }} --password=${{ inputs.password }} --silent 2>/dev/null; do sleep 1; done'
+
+    - name: Start Docker container
+      if: inputs.use-docker == 'true'
       shell: bash
       run: |
         docker run -d \
           --name ${{ inputs.container-name }} \
-          -e MYSQL_ROOT_PASSWORD=${{ inputs.db-password }} \
-          -p ${{ inputs.db-port }}:3306 \
+          -e MYSQL_ROOT_PASSWORD=${{ inputs.password }} \
+          -p ${{ inputs.port }}:3306 \
           --health-cmd="mysqladmin ping --silent" \
           --health-interval=10s \
           --health-timeout=5s \
           --health-retries=3 \
-          mysql:${{ inputs.mysql-version }}
+          ${{ inputs.image }}:${{ inputs.version }}
 
-    - name: Wait for healthy status
+    - name: Wait for Docker healthy status
+      if: inputs.use-docker == 'true'
       shell: bash
       run: |
         echo "Waiting for MySQL to be healthy..."
@@ -60,36 +86,32 @@ runs:
     - name: Create databases
       shell: bash
       run: |
-        # Create primary database
         echo "Creating primary database: ${{ inputs.db-name }}"
-        mysql --host=${{ inputs.db-host }} --user=${{ inputs.db-username }} --password=${{ inputs.db-password }} \
+        mysql --host=${{ inputs.host }} --user=${{ inputs.username }} --password=${{ inputs.password }} \
           -e "CREATE DATABASE IF NOT EXISTS \`${{ inputs.db-name }}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
-        # Create additional databases
         for db_name in $(echo '${{ inputs.db-names }}' | jq -r '.[]'); do
           echo "Creating additional database: $db_name"
-          mysql --host=${{ inputs.db-host }} --user=${{ inputs.db-username }} --password=${{ inputs.db-password }} \
+          mysql --host=${{ inputs.host }} --user=${{ inputs.username }} --password=${{ inputs.password }} \
             -e "CREATE DATABASE IF NOT EXISTS \`$db_name\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
         done
 
     - name: Import schemas
       shell: bash
       run: |
-        # Check for primary database schema (named after connection)
         for schema_file in "database/schema/mysql.sql" "database/schema/mysql-schema.sql"; do
           if [ -f "$schema_file" ]; then
             echo "Importing schema: $schema_file"
-            mysql --host=${{ inputs.db-host }} --user=${{ inputs.db-username }} --password=${{ inputs.db-password }} "${{ inputs.db-name }}" < "$schema_file"
+            mysql --host=${{ inputs.host }} --user=${{ inputs.username }} --password=${{ inputs.password }} "${{ inputs.db-name }}" < "$schema_file"
             break
           fi
         done
 
-        # Check additional databases for schema files
         for db_name in $(echo '${{ inputs.db-names }}' | jq -r '.[]'); do
           for schema_file in "database/schema/${db_name}.sql" "database/schema/${db_name}-schema.sql"; do
             if [ -f "$schema_file" ]; then
               echo "Importing schema: $schema_file"
-              mysql --host=${{ inputs.db-host }} --user=${{ inputs.db-username }} --password=${{ inputs.db-password }} "$db_name" < "$schema_file"
+              mysql --host=${{ inputs.host }} --user=${{ inputs.username }} --password=${{ inputs.password }} "$db_name" < "$schema_file"
               break
             fi
           done
