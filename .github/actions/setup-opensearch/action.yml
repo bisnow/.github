@@ -32,7 +32,7 @@ runs:
         if ! docker ps -a --format '{{.Names}}' | grep -qx '${{ inputs.container-name }}'; then
           docker run -d \
             --name ${{ inputs.container-name }} \
-            -e OPENSEARCH_INITIAL_ADMIN_PASSWORD='Test1234!' \
+            -e OPENSEARCH_INITIAL_ADMIN_PASSWORD='C1@rKs0n#Dev' \
             -e node.name=es01 \
             -e cluster.name=es-docker-cluster \
             -e discovery.type=single-node \
