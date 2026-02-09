@@ -32,6 +32,7 @@ runs:
         if ! docker ps -a --format '{{.Names}}' | grep -qx '${{ inputs.container-name }}'; then
           docker run -d \
             --name ${{ inputs.container-name }} \
+            -e OPENSEARCH_INITIAL_ADMIN_PASSWORD='Test1234!' \
             -e node.name=es01 \
             -e cluster.name=es-docker-cluster \
             -e discovery.type=single-node \
@@ -54,3 +55,14 @@ runs:
       run: |
         echo "Waiting for OpenSearch to be healthy..."
         timeout 60 sh -c 'until docker inspect --format="{{.State.Health.Status}}" ${{ inputs.container-name }} | grep -q healthy; do sleep 2; done'
+
+    - name: Verify host connectivity
+      if: inputs.wait == 'true'
+      shell: bash
+      run: |
+        echo "Verifying OpenSearch is accessible on port ${{ inputs.port }}..."
+        curl -sf http://127.0.0.1:${{ inputs.port }}/_cluster/health || {
+          echo "::warning::OpenSearch health check passed but host connectivity failed"
+          docker logs ${{ inputs.container-name }} --tail 20
+          exit 1
+        }
