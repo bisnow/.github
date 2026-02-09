@@ -110,7 +110,13 @@ runs:
       if: inputs.wait == 'true'
       shell: bash
       run: |
-        for schema_file in "database/schema/mysql.sql" "database/schema/mysql-schema.sql"; do
+        schema_candidates=(
+          "database/schema/${{ inputs.db-name }}.sql"
+          "database/schema/${{ inputs.db-name }}-schema.sql"
+          "database/schema/mysql.sql"
+          "database/schema/mysql-schema.sql"
+        )
+        for schema_file in "${schema_candidates[@]}"; do
           if [ -f "$schema_file" ]; then
             echo "Importing schema: $schema_file"
             mysql --host=${{ inputs.host }} --user=${{ inputs.username }} --password=${{ inputs.password }} "${{ inputs.db-name }}" < "$schema_file"
