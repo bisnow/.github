@@ -12,6 +12,7 @@ This repository contains shared configuration, reusable workflows, and composite
         - [With Frontend Build](#with-frontend-build)
         - [With OpenSearch](#with-opensearch)
         - [With PostgreSQL](#with-postgresql)
+        - [With Artisan Commands](#with-artisan-commands)
         - [With Docker (Specific Versions)](#with-docker-specific-versions)
         - [With Flux Pro](#with-flux-pro)
         - [Full Example](#full-example)
@@ -141,6 +142,33 @@ jobs:
     secrets:
       COMPOSER_OAUTH_GITHUB_ACTIONS: ${{ secrets.COMPOSER_OAUTH_GITHUB_ACTIONS }}
 ```
+
+#### With Artisan Commands
+
+For applications that need to run artisan commands before tests (e.g. seeding OpenSearch data):
+
+```yaml
+jobs:
+  tests:
+    uses: bisnow/.github/.github/workflows/tests-laravel.yml@v2
+    with:
+      enable_opensearch: true
+      enable_npm: true
+      artisan_commands: php artisan opensearch:data
+    secrets:
+      COMPOSER_OAUTH_GITHUB_ACTIONS: ${{ secrets.COMPOSER_OAUTH_GITHUB_ACTIONS }}
+```
+
+Multiple commands are supported:
+
+```yaml
+with:
+  artisan_commands: |
+    php artisan opensearch:data
+    php artisan cache:clear
+```
+
+Commands run after the application is prepared (`.env` copied, `key:generate` run) and all services are ready.
 
 #### With Docker (Specific Versions)
 
@@ -312,6 +340,12 @@ jobs:
 |-----------------|--------|-----------------|----------------------|
 | `redis_image`   | string | `valkey/valkey` | Docker image         |
 | `redis_version` | string | `alpine`        | Docker image version |
+
+##### Other
+
+| Input              | Type   | Default | Description                          |
+|--------------------|--------|---------|--------------------------------------|
+| `artisan_commands` | string |         | Artisan commands to run before tests |
 
 ##### Secrets
 
