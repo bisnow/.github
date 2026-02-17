@@ -162,6 +162,8 @@ on:
         required: false
         type: string
         default: 'alpine'
+
+      # Laravel
       artisan_commands:
         description: 'Artisan commands to run before tests'
         required: false

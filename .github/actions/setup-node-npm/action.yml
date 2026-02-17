@@ -40,6 +40,5 @@ runs:
         elif [ -f webpack.mix.js ]; then
           npm run prod
         else
-          echo "::error::Could not detect bundler (no vite.config.js, vite.config.ts, or webpack.mix.js). Set the build-script input explicitly."
-          exit 1
+          echo "::warning::Could not detect bundler (no vite.config.js, vite.config.ts, or webpack.mix.js). Skipping build step. Set the build-script input to suppress this warning."
         fi
