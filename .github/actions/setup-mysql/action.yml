@@ -46,6 +46,14 @@ inputs:
     description: Wait for service to be ready before continuing
     required: false
     default: 'true'
+  tmpfs:
+    description: Mount the MySQL datadir on tmpfs (RAM). Ephemeral CI only — speeds DDL/migrations. Docker mode only.
+    required: false
+    default: 'false'
+  mysqld-args:
+    description: Extra mysqld flags appended after the image (e.g. durability tuning for CI). Docker mode only.
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -73,11 +81,12 @@ runs:
             --name ${{ inputs.container-name }} \
             -e MYSQL_ROOT_PASSWORD=${{ inputs.password }} \
             -p ${{ inputs.port }}:3306 \
+            ${{ inputs.tmpfs == 'true' && '--tmpfs /var/lib/mysql:rw' || '' }} \
             --health-cmd="mysqladmin ping --silent" \
             --health-interval=10s \
             --health-timeout=5s \
             --health-retries=3 \
-            ${{ inputs.image }}:${{ inputs.version }}
+            ${{ inputs.image }}:${{ inputs.version }} ${{ inputs.mysqld-args }}
         fi
 
     - name: Wait for MySQL to be healthy

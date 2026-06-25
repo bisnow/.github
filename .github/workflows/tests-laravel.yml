@@ -87,6 +87,16 @@ on:
         required: false
         type: string
         default: '[]'
+      mysql_tmpfs:
+        description: 'Mount the dockerized MySQL datadir on tmpfs (RAM) — speeds migrations/DDL for ephemeral CI'
+        required: false
+        type: boolean
+        default: false
+      mysql_args:
+        description: 'Extra mysqld flags for the dockerized MySQL (e.g. durability tuning for CI)'
+        required: false
+        type: string
+        default: ''
 
       # Node
       node_build_script:
@@ -242,6 +252,8 @@ jobs:
           password: ${{ inputs.mysql_password }}
           db-name: ${{ inputs.mysql_db_name }}
           db-names: ${{ inputs.mysql_db_names }}
+          tmpfs: ${{ inputs.mysql_tmpfs }}
+          mysqld-args: ${{ inputs.mysql_args }}
 
       - name: Start OpenSearch
         if: ${{ inputs.enable_opensearch }}
