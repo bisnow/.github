@@ -7,6 +7,11 @@ on:
         required: false
         type: string
         default: '8.4'
+      runs_on:
+        description: 'Runner label(s) for the job (e.g. a self-hosted ARC scale set). Defaults to GitHub-hosted ubuntu-latest.'
+        required: false
+        type: string
+        default: 'ubuntu-latest'
     secrets:
       COMPOSER_OAUTH_GITHUB_ACTIONS:
         required: true
@@ -18,7 +23,7 @@ on:
 jobs:
   pint:
     name: Pint & Rector
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs_on }}
     permissions:
       contents: write
     steps:
