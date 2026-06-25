@@ -23,6 +23,11 @@ on:
         required: false
         type: string
         default: ''
+      parallel_processes:
+        description: 'Explicit paratest worker count for `composer test` (appended as --processes=N). When empty, paratest auto-detects from CPU count.'
+        required: false
+        type: string
+        default: ''
       dependency_version:
         description: 'JSON array of dependency-version values for the matrix'
         required: false
@@ -353,7 +358,12 @@ jobs:
         run: composer phpstan
 
       - name: Run tests
-        run: composer test
+        run: |
+          if [ -n "${{ inputs.parallel_processes }}" ]; then
+            composer test -- --processes=${{ inputs.parallel_processes }}
+          else
+            composer test
+          fi
 
       - name: Stop containers
         if: always()
