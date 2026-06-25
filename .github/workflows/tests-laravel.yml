@@ -18,6 +18,11 @@ on:
         required: false
         type: string
         default: '["ubuntu-24.04"]'
+      runs_on:
+        description: 'Override the runner label(s) (e.g. a self-hosted ARC scale set). When empty, falls back to the matrix `os` value.'
+        required: false
+        type: string
+        default: ''
       dependency_version:
         description: 'JSON array of dependency-version values for the matrix'
         required: false
@@ -201,7 +206,7 @@ env:
 jobs:
   PHPUnit:
     name: PHPUnit & PHPStan
-    runs-on: ${{ matrix.operating-system }}
+    runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || matrix.operating-system }}
 
     strategy:
       fail-fast: true
