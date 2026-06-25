@@ -14,7 +14,29 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Set up Node
+    # Prefer the Node baked into the runner image when its major matches the
+    # requested version, skipping actions/setup-node (which downloads Node each
+    # job). npm uses the shared FSx cache via npm_config_cache. Falls back to
+    # actions/setup-node on any mismatch, so it's safe for every repo.
+    - name: Check for usable baked Node
+      id: node-check
+      shell: bash
+      run: |
+        set -uo pipefail
+        vf='${{ inputs.node-version-file }}'
+        want=""
+        [ -f "$vf" ] && want=$(tr -d ' \t\r' < "$vf" | sed -E 's/^v//; s/\..*$//' | head -1)
+        have=$(node --version 2>/dev/null | sed -E 's/^v//; s/\..*$//')
+        if [ -n "$want" ] && [ "$have" = "$want" ]; then
+          echo "use_system=true" >> "$GITHUB_OUTPUT"
+          echo "::notice::Using baked Node $(node --version) (npm $(npm --version))"
+        else
+          echo "use_system=false" >> "$GITHUB_OUTPUT"
+          echo "::notice::Falling back to actions/setup-node (want '${want:-?}', baked '${have:-none}')"
+        fi
+
+    - name: Set up Node (actions/setup-node fallback)
+      if: steps.node-check.outputs.use_system != 'true'
       uses: actions/setup-node@v6
       with:
         node-version-file: ${{ inputs.node-version-file }}
