@@ -82,6 +82,16 @@ runs:
           mkdir -p "$HOME/.local/bin"
           ln -sf "$bin" "$HOME/.local/bin/php"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          # The runner image ships pcov disabled by default (pcov.enabled=0) so
+          # Rector isn't instrumented. When a coverage driver IS requested (test
+          # jobs), re-enable it via an appended ini-scan dir — otherwise the test
+          # runner exits non-zero on "No code coverage driver is available".
+          if [ "$cov" = "pcov" ] || [ "$cov" = "xdebug" ]; then
+            mkdir -p "$HOME/.php-ci-ini"
+            echo "${cov}.enabled=1" > "$HOME/.php-ci-ini/zz-coverage.ini"
+            echo "PHP_INI_SCAN_DIR=:$HOME/.php-ci-ini" >> "$GITHUB_ENV"
+            echo "::notice::Enabled ${cov} for coverage via PHP_INI_SCAN_DIR"
+          fi
           echo "::notice::Using baked PHP ${want} ($("$bin" -v | head -1))"
         else
           echo "::notice::Falling back to shivammathur/setup-php (${reason})"
