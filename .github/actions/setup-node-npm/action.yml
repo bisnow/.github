@@ -14,10 +14,14 @@ inputs:
 runs:
   using: composite
   steps:
-    # Prefer the Node baked into the runner image when its major matches the
-    # requested version, skipping actions/setup-node (which downloads Node each
-    # job). npm uses the shared FSx cache via npm_config_cache. Falls back to
-    # actions/setup-node on any mismatch, so it's safe for every repo.
+    # Prefer the Node baked into the runner image when the requested major is
+    # available, skipping actions/setup-node (which downloads Node each job).
+    # The runner image bakes several majors side by side under
+    # /usr/local/lib/nodejs/<major>/bin; if the requested major is baked there we
+    # prepend it to PATH so later steps' `node`/`npm` resolve to it. Otherwise we
+    # accept the default `node` on PATH when its major matches (older images that
+    # baked a single version). npm uses the shared FSx cache via npm_config_cache.
+    # Falls back to actions/setup-node on any mismatch, so it's safe for every repo.
     - name: Check for usable baked Node
       id: node-check
       shell: bash
@@ -26,11 +30,16 @@ runs:
         vf='${{ inputs.node-version-file }}'
         want=""
         [ -f "$vf" ] && want=$(tr -d ' \t\r' < "$vf" | sed -E 's/^v//; s/\..*$//' | head -1)
-        have=$(node --version 2>/dev/null | sed -E 's/^v//; s/\..*$//')
-        if [ -n "$want" ] && [ "$have" = "$want" ]; then
+        baked_bin="/usr/local/lib/nodejs/${want}/bin"
+        if [ -n "$want" ] && [ -x "$baked_bin/node" ]; then
+          echo "$baked_bin" >> "$GITHUB_PATH"
+          echo "use_system=true" >> "$GITHUB_OUTPUT"
+          echo "::notice::Using baked Node $("$baked_bin/node" --version) (npm $("$baked_bin/npm" --version))"
+        elif [ -n "$want" ] && [ "$(node --version 2>/dev/null | sed -E 's/^v//; s/\..*$//')" = "$want" ]; then
           echo "use_system=true" >> "$GITHUB_OUTPUT"
           echo "::notice::Using baked Node $(node --version) (npm $(npm --version))"
         else
+          have=$(node --version 2>/dev/null | sed -E 's/^v//; s/\..*$//')
           echo "use_system=false" >> "$GITHUB_OUTPUT"
           echo "::notice::Falling back to actions/setup-node (want '${want:-?}', baked '${have:-none}')"
         fi
