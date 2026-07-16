@@ -353,6 +353,9 @@ jobs:
             phpstan-result-cache-${{ github.repository }}-${{ runner.os }}-php${{ matrix.php }}-
             phpstan-result-cache-${{ github.repository }}-${{ runner.os }}-
 
+      - name: Install system packages
+        run: sudo apt-get update && sudo apt-get install -y aspell aspell-en
+
       - name: Prepare application
         run: |
           if [ -f .env.ci.example ]; then
