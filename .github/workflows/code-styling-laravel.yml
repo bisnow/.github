@@ -7,6 +7,11 @@ on:
         required: false
         type: string
         default: '8.4'
+      php_extensions:
+        description: 'Comma-separated PHP extensions to require (e.g. "pdo_sqlite, gd")'
+        required: false
+        type: string
+        default: ''
       runs_on:
         description: 'Runner label(s) for the job (e.g. a self-hosted ARC scale set). Defaults to GitHub-hosted ubuntu-latest.'
         required: false
@@ -32,40 +37,16 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
 
-      # Prefer the baked PHP (Pint/Rector only need php + composer, both baked);
-      # fall back to setup-php if the requested version isn't in the image.
-      - name: Check for usable baked PHP
-        id: php-check
-        shell: bash
-        run: |
-          set -uo pipefail
-          want='${{ inputs.php || '8.4' }}'
-          bin="/usr/bin/php${want}"
-          if [ -x "$bin" ] && command -v composer >/dev/null 2>&1; then
-            mkdir -p "$HOME/.local/bin"
-            ln -sf "$bin" "$HOME/.local/bin/php"
-            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-            echo "use_system=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::Using baked PHP ${want} ($("$bin" -v | head -1))"
-          else
-            echo "use_system=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Falling back to shivammathur/setup-php (php${want} or composer not baked)"
-          fi
-
-      - name: Set up PHP (setup-php fallback)
-        if: steps.php-check.outputs.use_system != 'true'
-        uses: shivammathur/setup-php@v2
+      - name: Set up PHP & install dependencies
+        uses: bisnow/.github/.github/actions/setup-php-composer@main
         with:
           php-version: ${{ inputs.php || '8.4' }}
-          tools: composer
-
-      - name: Install dependencies
-        run: |
-          composer config github-oauth.github.com ${{ secrets.COMPOSER_OAUTH_GITHUB_ACTIONS }}
-          if [ -n "${{ secrets.FLUX_USERNAME }}" ]; then
-            composer config http-basic.composer.fluxui.dev "${{ secrets.FLUX_USERNAME }}" "${{ secrets.FLUX_PASSWORD }}"
-          fi
-          composer install --no-scripts --no-progress
+          extensions: ${{ inputs.php_extensions }}
+          coverage: none
+          composer-oauth-token: ${{ secrets.COMPOSER_OAUTH_GITHUB_ACTIONS }}
+          flux-username: ${{ secrets.FLUX_USERNAME }}
+          flux-password: ${{ secrets.FLUX_PASSWORD }}
+          composer-install-flags: '--no-scripts'
 
       - name: Run Laravel Rector
         run: composer rector

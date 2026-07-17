@@ -22,6 +22,10 @@ inputs:
   flux-password:
     description: Flux Pro password
     required: false
+  composer-install-flags:
+    description: 'Extra flags appended to `composer install` (e.g. "--no-scripts")'
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -129,4 +133,4 @@ runs:
         if [ -n "${{ inputs.flux-username }}" ]; then
           composer config http-basic.composer.fluxui.dev "${{ inputs.flux-username }}" "${{ inputs.flux-password }}"
         fi
-        composer install --no-progress --prefer-dist --optimize-autoloader
+        composer install --no-progress --prefer-dist --optimize-autoloader ${{ inputs.composer-install-flags }}
