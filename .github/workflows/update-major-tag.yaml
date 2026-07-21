@@ -12,24 +12,24 @@ jobs:
   update-major-tag:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
+      - name: Generate token for bisnow-flux-gitops-app
+        uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ secrets.FLUX_APP_ID }}
+          private-key: ${{ secrets.FLUX_APP_PRIVATE_KEY }}
 
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Extract version tags
-        id: tags
-        run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          MAJOR="${TAG%%.*}"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Update major version tag
         run: |
-          echo "Updating ${{ steps.tags.outputs.major }} to point to ${{ steps.tags.outputs.tag }}"
-          git tag -f "${{ steps.tags.outputs.major }}"
-          git push origin "${{ steps.tags.outputs.major }}" --force
+          git config user.name "bisnow-flux-gitops-app[bot]"
+          git config user.email "bisnow-flux-gitops-app[bot]@users.noreply.github.com"
+
+          TAG="${GITHUB_REF#refs/tags/}"
+          MAJOR="${TAG%%.*}"
+          echo "Updating $MAJOR to point to $TAG"
+          git tag -f "$MAJOR"
+          git push origin "$MAJOR" --force
