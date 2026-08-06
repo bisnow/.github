@@ -17,6 +17,11 @@ on:
         required: false
         type: string
         default: 'ubuntu-latest'
+      enable_npm:
+        description: 'Enable NPM install/build steps'
+        required: false
+        type: boolean
+        default: false
     secrets:
       COMPOSER_OAUTH_GITHUB_ACTIONS:
         required: true
@@ -47,6 +52,10 @@ jobs:
           flux-username: ${{ secrets.FLUX_USERNAME }}
           flux-password: ${{ secrets.FLUX_PASSWORD }}
           composer-install-flags: '--no-scripts'
+
+      - name: Set up Node and npm
+        if: ${{ inputs.enable_npm }}
+        uses: bisnow/.github/.github/actions/setup-node-npm@v2
 
       - name: Run Laravel Rector
         run: composer rector
