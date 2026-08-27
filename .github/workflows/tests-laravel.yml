@@ -1,7 +1,9 @@
 name: Tests
+# contents: write is what lets the optional Rector/Pint auto-commit push back to
+# the branch (the same grant code-styling-laravel.yml has always declared).
 permissions:
   id-token: write
-  contents: read
+  contents: write
   pull-requests: read
 
 on:
@@ -28,6 +30,11 @@ on:
         required: false
         type: string
         default: ''
+      run_code_styling:
+        description: 'Run Rector and Pint (each auto-committing its fixes) in this job before static analysis, so a repo can drop its separate code-styling job and its runner hand-off.'
+        required: false
+        type: boolean
+        default: false
       dependency_version:
         description: 'JSON array of dependency-version values for the matrix'
         required: false
@@ -305,6 +312,32 @@ jobs:
         with:
           build-script: ${{ inputs.node_build_script }}
           node-version-file: ${{ inputs.node_version_file }}
+
+      # Optional code styling, run here while the service containers finish
+      # initializing. Mirrors code-styling-laravel.yml step for step.
+      - name: Run Laravel Rector
+        if: ${{ inputs.run_code_styling }}
+        run: composer rector
+
+      - name: Commit Rector fixes
+        if: ${{ inputs.run_code_styling }}
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: "[skip actions] Apply rector fixes"
+          commit_user_name: GitHub Action
+          commit_user_email: actions@github.com
+
+      - name: Run Laravel Pint
+        if: ${{ inputs.run_code_styling }}
+        run: composer cs-fix
+
+      - name: Commit style fixes
+        if: ${{ inputs.run_code_styling }}
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: "[skip actions] Apply style fixes"
+          commit_user_name: GitHub Action
+          commit_user_email: actions@github.com
 
       # Wait for services, create databases, and import schemas
       - name: Set up MySQL
