@@ -240,7 +240,7 @@ jobs:
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.head_ref }}
 
@@ -377,7 +377,7 @@ jobs:
           container-name: ${{ env.REDIS_CONTAINER }}
 
       - name: Cache PHPStan results
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .phpstan.cache
           key: "phpstan-result-cache-${{ github.repository }}-${{ runner.os }}-php${{ matrix.php }}-${{ hashFiles('composer.lock') }}-${{ hashFiles('phpstan.neon.dist') }}-${{ hashFiles('app/**/*.php') }}"

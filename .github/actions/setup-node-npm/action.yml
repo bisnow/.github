@@ -46,7 +46,7 @@ runs:
 
     - name: Set up Node (actions/setup-node fallback)
       if: steps.node-check.outputs.use_system != 'true'
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v7
       with:
         node-version-file: ${{ inputs.node-version-file }}
         cache: 'npm'
