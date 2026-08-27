@@ -240,7 +240,7 @@ jobs:
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.head_ref }}
 
@@ -323,7 +323,7 @@ jobs:
         if: ${{ inputs.run_code_styling }}
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
-          commit_message: "[skip actions] Apply rector fixes"
+          commit_message: "Apply rector fixes"
           commit_user_name: GitHub Action
           commit_user_email: actions@github.com
 
@@ -335,7 +335,7 @@ jobs:
         if: ${{ inputs.run_code_styling }}
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
-          commit_message: "[skip actions] Apply style fixes"
+          commit_message: "Apply style fixes"
           commit_user_name: GitHub Action
           commit_user_email: actions@github.com
 
@@ -377,7 +377,7 @@ jobs:
           container-name: ${{ env.REDIS_CONTAINER }}
 
       - name: Cache PHPStan results
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .phpstan.cache
           key: "phpstan-result-cache-${{ github.repository }}-${{ runner.os }}-php${{ matrix.php }}-${{ hashFiles('composer.lock') }}-${{ hashFiles('phpstan.neon.dist') }}-${{ hashFiles('app/**/*.php') }}"
