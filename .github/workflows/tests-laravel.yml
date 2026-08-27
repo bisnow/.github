@@ -323,7 +323,7 @@ jobs:
         if: ${{ inputs.run_code_styling }}
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
-          commit_message: "[skip actions] Apply rector fixes"
+          commit_message: "Apply rector fixes"
           commit_user_name: GitHub Action
           commit_user_email: actions@github.com
 
@@ -335,7 +335,7 @@ jobs:
         if: ${{ inputs.run_code_styling }}
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
-          commit_message: "[skip actions] Apply style fixes"
+          commit_message: "Apply style fixes"
           commit_user_name: GitHub Action
           commit_user_email: actions@github.com
 
