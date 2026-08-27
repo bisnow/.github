@@ -116,7 +116,32 @@ runs:
       shell: bash
       run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
 
+    # On the ARC runners COMPOSER_CACHE_DIR already points at the shared FSx
+    # mount, so actions/cache would only re-download a tarball onto a directory
+    # that is persistent anyway. Use the mount for a vendor/ tarball instead:
+    # one extract replaces 200+ per-package archive extractions on every job.
+    - name: Restore vendor from the shared runner cache
+      id: vendor-cache
+      shell: bash
+      run: |
+        set -uo pipefail
+        if [ -z "${COMPOSER_CACHE_DIR:-}" ] || [ ! -d "${COMPOSER_CACHE_DIR}" ]; then
+          echo "shared=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        tarball="${COMPOSER_CACHE_DIR}/vendor/${GITHUB_REPOSITORY//\//_}-php${{ inputs.php-version }}-${{ hashFiles('**/composer.lock') }}.tar"
+        echo "shared=true" >> "$GITHUB_OUTPUT"
+        echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+        if [ -f "$tarball" ] && tar -xf "$tarball"; then
+          echo "hit=true" >> "$GITHUB_OUTPUT"
+          echo "::notice::Restored vendor/ from $tarball"
+        else
+          rm -rf vendor
+          echo "hit=false" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Cache dependencies
+      if: steps.vendor-cache.outputs.shared != 'true'
       uses: actions/cache@v5
       with:
         path: ${{ steps.composer-cache.outputs.dir }}
@@ -134,3 +159,14 @@ runs:
           composer config http-basic.composer.fluxui.dev "${{ inputs.flux-username }}" "${{ inputs.flux-password }}"
         fi
         composer install --no-progress --prefer-dist --optimize-autoloader ${{ inputs.composer-install-flags }}
+
+    - name: Save vendor to the shared runner cache
+      if: steps.vendor-cache.outputs.shared == 'true' && steps.vendor-cache.outputs.hit != 'true'
+      shell: bash
+      run: |
+        set -uo pipefail
+        tarball='${{ steps.vendor-cache.outputs.tarball }}'
+        mkdir -p "$(dirname "$tarball")"
+        tar -cf "$tarball.$$" vendor && mv -f "$tarball.$$" "$tarball"
+        find "$(dirname "$tarball")" -name '*.tar' -mtime +14 -delete
+        echo "::notice::Saved vendor/ to $tarball"
