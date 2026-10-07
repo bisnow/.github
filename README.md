@@ -343,9 +343,11 @@ jobs:
 
 ##### Other
 
-| Input              | Type   | Default | Description                          |
-|--------------------|--------|---------|--------------------------------------|
-| `artisan_commands` | string |         | Artisan commands to run before tests |
+| Input                | Type   | Default | Description                                                          |
+|----------------------|--------|---------|----------------------------------------------------------------------|
+| `artisan_commands`   | string |         | Artisan commands to run before tests                                 |
+| `parallel_processes` | string |         | Paratest worker count passed to the test script as `--processes=N`   |
+| `test_script`        | string | `test`  | Composer script the test step runs, e.g. `test-coverage` for a gate  |
 
 ##### Secrets
 
