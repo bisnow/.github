@@ -26,10 +26,15 @@ on:
         type: string
         default: ''
       parallel_processes:
-        description: 'Explicit paratest worker count for `composer test` (appended as --processes=N). When empty, paratest auto-detects from CPU count.'
+        description: 'Explicit paratest worker count for the test script (appended as --processes=N). When empty, paratest auto-detects from CPU count.'
         required: false
         type: string
         default: ''
+      test_script:
+        description: 'Composer script the test step runs, e.g. `test-coverage` for a run with a coverage gate. It must pass extra arguments through to `artisan test` when `parallel_processes` is set.'
+        required: false
+        type: string
+        default: 'test'
       run_code_styling:
         description: 'Run Rector and Pint (each auto-committing its fixes) in this job before static analysis, so a repo can drop its separate code-styling job and its runner hand-off.'
         required: false
@@ -405,11 +410,14 @@ jobs:
         run: composer phpstan
 
       - name: Run tests
+        env:
+          TEST_SCRIPT: ${{ inputs.test_script }}
+          PARALLEL_PROCESSES: ${{ inputs.parallel_processes }}
         run: |
-          if [ -n "${{ inputs.parallel_processes }}" ]; then
-            composer test -- --processes=${{ inputs.parallel_processes }}
+          if [ -n "$PARALLEL_PROCESSES" ]; then
+            composer "$TEST_SCRIPT" -- --processes="$PARALLEL_PROCESSES"
           else
-            composer test
+            composer "$TEST_SCRIPT"
           fi
 
       - name: Stop containers
