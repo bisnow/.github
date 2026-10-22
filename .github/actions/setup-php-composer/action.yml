@@ -93,6 +93,15 @@ runs:
           if [ "$cov" = "pcov" ] || [ "$cov" = "xdebug" ]; then
             mkdir -p "$HOME/.php-ci-ini"
             echo "${cov}.enabled=1" > "$HOME/.php-ci-ini/zz-coverage.ini"
+            # Both drivers override zend_execute_ex, which the JIT refuses: with
+            # the baked image's JIT buffer allocated, every PHP process starts
+            # with "JIT is incompatible with third party extensions" on stderr,
+            # and PHPUnit turns that warning into a test error. Either knob alone
+            # disables it (opcache.jit=off does not: it keeps the buffer and the
+            # warning); both are set so an image that changes one default cannot
+            # bring the JIT back.
+            echo "opcache.jit=disable" >> "$HOME/.php-ci-ini/zz-coverage.ini"
+            echo "opcache.jit_buffer_size=0" >> "$HOME/.php-ci-ini/zz-coverage.ini"
             echo "PHP_INI_SCAN_DIR=:$HOME/.php-ci-ini" >> "$GITHUB_ENV"
             echo "::notice::Enabled ${cov} for coverage via PHP_INI_SCAN_DIR"
           fi
