@@ -111,6 +111,8 @@ runs:
         fi
         echo "use_system=$use_system" >> "$GITHUB_OUTPUT"
 
+    # The same JIT rule as the baked path: a coverage driver overrides
+    # zend_execute_ex, and a JIT left enabled warns on every PHP start.
     - name: Set up PHP (setup-php fallback)
       if: steps.php-check.outputs.use_system != 'true'
       uses: shivammathur/setup-php@v2
@@ -118,6 +120,7 @@ runs:
         php-version: ${{ inputs.php-version }}
         extensions: ${{ inputs.extensions }}
         coverage: ${{ inputs.coverage }}
+        ini-values: ${{ (inputs.coverage == 'pcov' || inputs.coverage == 'xdebug') && 'opcache.jit=disable, opcache.jit_buffer_size=0' || '' }}
         tools: composer
 
     - name: Get Composer cache directory
