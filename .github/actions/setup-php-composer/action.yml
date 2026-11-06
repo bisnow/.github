@@ -14,8 +14,21 @@ inputs:
     required: false
     default: 'pcov'
   composer-oauth-token:
-    description: GitHub OAuth token for Composer
-    required: true
+    description: GitHub OAuth token for Composer. Used when no App key is given.
+    required: false
+    default: ''
+  composer-app-private-key:
+    description: >-
+      Private key of the bisnow-composer-read GitHub App. When set, a short-lived
+      read-only token minted from the App is used for Composer instead of
+      composer-oauth-token. Dependabot runs need this: they get only Dependabot
+      secrets, so composer-oauth-token arrives empty there.
+    required: false
+    default: ''
+  composer-app-id:
+    description: App ID of the GitHub App used with composer-app-private-key
+    required: false
+    default: '5644065'
   flux-username:
     description: Flux Pro username
     required: false
@@ -163,12 +176,33 @@ runs:
           ${{ runner.os }}-composer-
         enableCrossOsArchive: true
 
+    # The App can read only the private bisnow packages (contents: read), and
+    # its token expires within the hour and is revoked when the job ends.
+    - name: Mint a Composer token from the GitHub App
+      id: composer-app-token
+      if: inputs.composer-app-private-key != ''
+      uses: actions/create-github-app-token@v3
+      with:
+        client-id: ${{ inputs.composer-app-id }}
+        private-key: ${{ inputs.composer-app-private-key }}
+        owner: bisnow
+        permission-contents: read
+
+    # Credentials go through env, never straight into the script text.
     - name: Install dependencies
       shell: bash
+      env:
+        COMPOSER_GITHUB_TOKEN: ${{ steps.composer-app-token.outputs.token || inputs.composer-oauth-token }}
+        FLUX_USERNAME: ${{ inputs.flux-username }}
+        FLUX_PASSWORD: ${{ inputs.flux-password }}
       run: |
-        composer config -g github-oauth.github.com ${{ inputs.composer-oauth-token }}
-        if [ -n "${{ inputs.flux-username }}" ]; then
-          composer config http-basic.composer.fluxui.dev "${{ inputs.flux-username }}" "${{ inputs.flux-password }}"
+        if [ -n "$COMPOSER_GITHUB_TOKEN" ]; then
+          composer config -g github-oauth.github.com "$COMPOSER_GITHUB_TOKEN"
+        else
+          echo "::warning::No Composer GitHub token (neither composer-app-private-key nor composer-oauth-token is set); private packages will fail to download"
+        fi
+        if [ -n "$FLUX_USERNAME" ]; then
+          composer config http-basic.composer.fluxui.dev "$FLUX_USERNAME" "$FLUX_PASSWORD"
         fi
         composer install --no-progress --prefer-dist --optimize-autoloader ${{ inputs.composer-install-flags }}
 
