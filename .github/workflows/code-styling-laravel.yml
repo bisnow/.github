@@ -24,7 +24,10 @@ on:
         default: false
     secrets:
       COMPOSER_OAUTH_GITHUB_ACTIONS:
-        required: true
+        required: false
+      # Dependabot runs: the bisnow-composer-read App key (see setup-php-composer)
+      COMPOSER_APP_PRIVATE_KEY:
+        required: false
       FLUX_USERNAME:
         required: false
       FLUX_PASSWORD:
@@ -49,6 +52,7 @@ jobs:
           extensions: ${{ inputs.php_extensions }}
           coverage: none
           composer-oauth-token: ${{ secrets.COMPOSER_OAUTH_GITHUB_ACTIONS }}
+          composer-app-private-key: ${{ secrets.COMPOSER_APP_PRIVATE_KEY }}
           flux-username: ${{ secrets.FLUX_USERNAME }}
           flux-password: ${{ secrets.FLUX_PASSWORD }}
           composer-install-flags: '--no-scripts'
