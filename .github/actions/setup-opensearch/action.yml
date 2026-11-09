@@ -46,6 +46,7 @@ runs:
             --health-interval=10s \
             --health-timeout=5s \
             --health-retries=3 \
+            --health-start-period=60s \
             opensearchproject/opensearch:${{ inputs.version }}
         fi
 
@@ -54,14 +55,19 @@ runs:
       shell: bash
       run: |
         echo "Waiting for OpenSearch to be healthy..."
-        timeout 60 sh -c 'until docker inspect --format="{{.State.Health.Status}}" ${{ inputs.container-name }} | grep -q healthy; do sleep 2; done'
+        timeout 120 sh -c 'until docker inspect --format="{{.State.Health.Status}}" ${{ inputs.container-name }} | grep -qx healthy; do sleep 2; done' || {
+          echo "::error::OpenSearch did not report healthy in time"
+          docker inspect --format='{{json .State.Health}}' ${{ inputs.container-name }}
+          docker logs ${{ inputs.container-name }} --tail 50
+          exit 1
+        }
 
     - name: Verify host connectivity
       if: inputs.wait == 'true'
       shell: bash
       run: |
         echo "Verifying OpenSearch is accessible on port ${{ inputs.port }}..."
-        curl -sf http://127.0.0.1:${{ inputs.port }}/_cluster/health || {
+        timeout 30 sh -c 'until curl -sf http://127.0.0.1:${{ inputs.port }}/_cluster/health; do sleep 2; done' || {
           echo "::warning::OpenSearch health check passed but host connectivity failed"
           docker logs ${{ inputs.container-name }} --tail 20
           exit 1
