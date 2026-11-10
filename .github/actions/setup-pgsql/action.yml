@@ -87,7 +87,12 @@ runs:
       run: |
         if [ "${{ inputs.use-docker }}" = "true" ]; then
           echo "Waiting for PostgreSQL to be healthy..."
-          timeout 60 sh -c 'until docker inspect --format="{{.State.Health.Status}}" ${{ inputs.container-name }} | grep -q healthy; do sleep 2; done'
+          timeout 60 sh -c 'until docker inspect --format="{{.State.Health.Status}}" ${{ inputs.container-name }} | grep -qx healthy; do sleep 2; done' || {
+            echo "::error::PostgreSQL did not report healthy in time"
+            docker inspect --format='{{json .State.Health}}' ${{ inputs.container-name }}
+            docker logs ${{ inputs.container-name }} --tail 50
+            exit 1
+          }
         else
           echo "Waiting for PostgreSQL to accept connections..."
           timeout 30 sh -c 'until pg_isready -h ${{ inputs.host }} -p ${{ inputs.port }} 2>/dev/null; do sleep 1; done'
