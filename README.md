@@ -143,6 +143,8 @@ jobs:
       COMPOSER_OAUTH_GITHUB_ACTIONS: ${{ secrets.COMPOSER_OAUTH_GITHUB_ACTIONS }}
 ```
 
+A repository on PostgreSQL alone can set `enable_mysql: false` so no MySQL is started. The workflow still exports `DB_HOST`, `DB_PORT` (3306), `DB_DATABASE`, `DB_USERNAME` and `DB_PASSWORD` from the `mysql_*` inputs, so such a repository has to point its application at PostgreSQL itself, for example by writing a `DB_URL` to `$GITHUB_ENV` from `artisan_commands`.
+
 #### With Artisan Commands
 
 For applications that need to run artisan commands before tests (e.g. seeding OpenSearch data):
