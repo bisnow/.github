@@ -285,6 +285,7 @@ jobs:
 
 | Input               | Type    | Default | Description                      |
 |---------------------|---------|---------|----------------------------------|
+| `enable_mysql`      | boolean | `true`  | Enable MySQL                     |
 | `enable_npm`        | boolean | `false` | Enable Node.js install and build |
 | `enable_opensearch` | boolean | `false` | Enable OpenSearch container      |
 | `enable_pgsql`      | boolean | `false` | Enable PostgreSQL                |
