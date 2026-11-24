@@ -47,6 +47,11 @@ on:
         default: '["prefer-stable"]'
 
       # Feature flags
+      enable_mysql:
+        description: 'Enable MySQL. Set to false in a repo that does not use it, so no job starts a database nothing connects to.'
+        required: false
+        type: boolean
+        default: true
       enable_npm:
         description: 'Enable NPM install/build steps'
         required: false
@@ -256,6 +261,7 @@ jobs:
 
       # Start all services (without waiting)
       - name: Start MySQL
+        if: ${{ inputs.enable_mysql }}
         uses: bisnow/.github/.github/actions/setup-mysql@v2
         with:
           wait: false
@@ -352,6 +358,7 @@ jobs:
 
       # Wait for services, create databases, and import schemas
       - name: Set up MySQL
+        if: ${{ inputs.enable_mysql }}
         uses: bisnow/.github/.github/actions/setup-mysql@v2
         with:
           use-docker: ${{ inputs.mysql_use_docker }}
